@@ -1,14 +1,58 @@
 # Node dependencies
 node_modules/
+.pnp/
+.pnp.js
 
-# Environment variables
+# Environment Variables (Highly Sensitive)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Logs
+# Logs & Debug Files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# Security & Credentials (Prevent accidental leaks)
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+
+# Database & Cache
+*.sqlite
+*.sqlite3
+*.db
+*.mdb
+*.accdb
+dump.sql
+cache/
+__pycache__/
+*.log
+
+# Build Output
+build/
+dist/
+tmp/
+temp/
+
+# IDE / Editor Settings (VSCode, JetBrains, Eclipse)
+.vscode/
+.idea/
+*.iml
+
+# OS-Specific Files (Mac, Windows, Linux)
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# GitHub / CI/CD Configurations (Avoid private key exposure)
+.github/
+.circleci/
+.travis.yml
