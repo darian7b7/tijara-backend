@@ -1,7 +1,9 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import User from "../models/user.model.js";
+import { PrismaClient } from "@prisma/client";
 import { validationResult } from "express-validator";
+
+const prisma = new PrismaClient();
 
 const signToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {

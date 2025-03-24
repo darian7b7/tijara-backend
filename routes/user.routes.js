@@ -1,6 +1,6 @@
 import express from "express";
 import { protect } from "../middleware/auth.js";
-import User from "../models/user.model.js";
+import { PrismaClient } from "@prisma/client";
 import {
   updateProfile,
   getUserProfile,
@@ -14,6 +14,7 @@ import {
   uploadToR2,
 } from "../middleware/upload.middleware.js";
 
+const prisma = new PrismaClient();
 const router = express.Router();
 
 // Middleware to process profile picture

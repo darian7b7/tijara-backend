@@ -1,8 +1,10 @@
-import User from "../models/user.model.js";
+import { PrismaClient } from "@prisma/client";
 import { uploadToR2, deleteFromR2 } from "../config/cloudflareR2.js";
 import bcrypt from "bcryptjs";
 import validator from "validator";
 import Listing from "../models/listing.model.js"; // Ensure .js is included
+
+const prisma = new PrismaClient();
 
 /**
  * ✅ Get the user's profile
