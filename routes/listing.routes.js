@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import express from "express";
 import { protect } from "../middleware/auth.js";
 import {
@@ -7,127 +6,275 @@ import {
   processImage,
   processImagesMiddleware,
 } from "../middleware/upload.middleware.js";
-import {
-  createListing,
-  getListings,
-  getListingById,
-  updateListing,
-  deleteListing,
-  getUserListings,
-  getTrendingListings,
-  searchListings,
-} from "../controllers/listing.controller.js";
-import Listing from "../models/listing.model.js";
+import { PrismaClient } from "@prisma/client";
 
+const prisma = new PrismaClient();
 const router = express.Router();
 
 // Public Routes
-router.get("/", getListings);
-router.get("/search", searchListings);
-router.get("/trending", getTrendingListings);
+router.get("/", async (req, res) => {
+  try {
+    const listings = await prisma.listing.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        images: true,
+        category: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(listings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/search", async (req, res) => {
+  try {
+    const { query, category, minPrice, maxPrice } = req.query;
+    
+    const where = {
+      status: 'ACTIVE',
+      ...(query && {
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+        ],
+      }),
+      ...(category && { categoryId: category }),
+      ...(minPrice || maxPrice ? {
+        price: {
+          ...(minPrice && { gte: parseFloat(minPrice) }),
+          ...(maxPrice && { lte: parseFloat(maxPrice) }),
+        },
+      } : {}),
+    };
+
+    const listings = await prisma.listing.findMany({
+      where,
+      include: {
+        images: true,
+        category: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    
+    res.json(listings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/trending", async (req, res) => {
+  try {
+    const trendingListings = await prisma.listing.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        images: true,
+        category: true,
+        _count: {
+          select: { favorites: true },
+        },
+      },
+      orderBy: {
+        favorites: {
+          _count: 'desc',
+        },
+      },
+      take: 10,
+    });
+    res.json(trendingListings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Protected Routes
 router.use(protect);
 
-// Order matters! Put specific routes before parameterized routes
 router.get("/saved", async (req, res) => {
   try {
-    const userId = req.user._id;
-    const savedListings = await Listing.find({ savedBy: userId })
-      .populate("seller", "username profilePicture")
-      .lean();
-
-    res.json({
-      success: true,
-      data: {
-        items: savedListings,
-        totalItems: savedListings.length,
-        page: 1,
-        limit: savedListings.length,
-        hasMore: false
-      }
+    const savedListings = await prisma.favorite.findMany({
+      where: { userId: req.user.id },
+      include: {
+        listing: {
+          include: {
+            images: true,
+            category: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
+    res.json(savedListings.map(favorite => favorite.listing));
   } catch (error) {
-    console.error("Error fetching saved listings:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Error fetching saved listings",
-      data: null
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Get user's listings
-router.get("/user", getUserListings);
-
-router.post("/", upload.array("images"), processImagesMiddleware, createListing);
-router.put("/:id", upload.array("images"), processImagesMiddleware, updateListing);
-router.delete("/:id", deleteListing);
-
-// Get listing by ID - Move this after specific routes
-router.get("/:id", getListingById);
-
-// Toggle save status
-router.post("/:id/toggle-save", async (req, res) => {
+router.post("/", upload.array("images"), processImagesMiddleware, async (req, res) => {
   try {
-    const { id } = req.params;
-    const userId = req.user._id;
+    const { title, description, price, categoryId, attributes = [], features = [] } = req.body;
+    const images = req.processedImages || [];
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID",
-        data: null
-      });
-    }
-
-    const listing = await Listing.findById(id);
-    if (!listing) {
-      return res.status(404).json({ 
-        success: false,
-        error: "Listing not found",
-        data: null
-      });
-    }
-
-    const isSaved = listing.savedBy.includes(userId);
-    if (isSaved) {
-      listing.savedBy = listing.savedBy.filter(
-        (id) => id.toString() !== userId.toString(),
-      );
-    } else {
-      listing.savedBy.push(userId);
-    }
-
-    await listing.save();
-    res.json({
-      success: true,
+    const listing = await prisma.listing.create({
       data: {
-        saved: !isSaved,
-        listing: isSaved ? null : listing
-      }
+        title,
+        description,
+        price: parseFloat(price),
+        categoryId,
+        userId: req.user.id,
+        images: {
+          create: images.map((image, index) => ({
+            url: image.url,
+            order: index,
+          })),
+        },
+        attributes: {
+          create: attributes.map(attr => ({
+            attributeDefinitionId: attr.definitionId,
+            value: attr.value,
+          })),
+        },
+        features: {
+          create: features.map(feat => ({
+            featureDefinitionId: feat.definitionId,
+            value: feat.value,
+          })),
+        },
+      },
+      include: {
+        images: true,
+        category: true,
+        attributes: true,
+        features: true,
+      },
     });
+
+    res.status(201).json(listing);
   } catch (error) {
-    console.error("Error toggling save status:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Error updating saved status",
-      data: null
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
-const formatListingResponse = (listing) => {
-  const formatted = { ...listing };
-  formatted.price = parseFloat(listing.price).toLocaleString();
+router.get("/:id", async (req, res) => {
+  try {
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: {
+        images: true,
+        category: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        attributes: {
+          include: {
+            attributeDefinition: true,
+          },
+        },
+        features: {
+          include: {
+            featureDefinition: true,
+          },
+        },
+      },
+    });
 
-  ["size", "bedrooms", "bathrooms", "mileage"].forEach((field) => {
-    if (listing.details[field]) {
-      formatted.details[field] = parseFloat(listing.details[field]);
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
     }
-  });
 
-  return formatted;
-};
+    res.json(listing);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/:id", upload.array("images"), processImagesMiddleware, async (req, res) => {
+  try {
+    const { title, description, price, categoryId, attributes = [], features = [] } = req.body;
+    const newImages = req.processedImages || [];
+    const existingImages = req.body.existingImages || [];
+
+    // First, delete removed images
+    await prisma.image.deleteMany({
+      where: {
+        listingId: req.params.id,
+        url: { notIn: existingImages },
+      },
+    });
+
+    // Update the listing
+    const listing = await prisma.listing.update({
+      where: { id: req.params.id },
+      data: {
+        title,
+        description,
+        price: parseFloat(price),
+        categoryId,
+        images: {
+          create: newImages.map((image, index) => ({
+            url: image.url,
+            order: existingImages.length + index,
+          })),
+        },
+        attributes: {
+          deleteMany: {},
+          create: attributes.map(attr => ({
+            attributeDefinitionId: attr.definitionId,
+            value: attr.value,
+          })),
+        },
+        features: {
+          deleteMany: {},
+          create: features.map(feat => ({
+            featureDefinitionId: feat.definitionId,
+            value: feat.value,
+          })),
+        },
+      },
+      include: {
+        images: true,
+        category: true,
+        attributes: true,
+        features: true,
+      },
+    });
+
+    res.json(listing);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    await prisma.listing.delete({
+      where: { id: req.params.id },
+    });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 export default router;

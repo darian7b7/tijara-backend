@@ -1,25 +1,34 @@
+// This is your Prisma schema file
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-
 generator client {
   provider = "prisma-client-js"
 }
 
-
 // Main Models
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String         @id @default(cuid())
+  email         String        @unique
   name          String?
+  username      String        @unique
   password      String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  profilePicture String?
+  bio           String?
+  location      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  role          UserRole      @default(USER)
+  
+  // Relations
   listings      Listing[]
   favorites     Favorite[]
-  role          UserRole  @default(USER)
+  sentMessages     Message[]        @relation("SentMessages")
+  receivedMessages Message[]        @relation("ReceivedMessages")
+  conversations    Conversation[]   @relation("UserConversations")
+  notifications    Notification[]
 }
 
 enum UserRole {
@@ -31,25 +40,25 @@ model Listing {
   id            String         @id @default(cuid())
   title         String
   description   String
-  price         Decimal        @db.Decimal(10, 2)
+  price         Float
   location      String
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   status        ListingStatus  @default(ACTIVE)
   listingAction ListingAction  @default(SELL)
+  condition     String?
+  category      String
   
   // Relations
   userId        String
   user          User           @relation(fields: [userId], references: [id])
-  categoryId    String
-  category      Category       @relation(fields: [categoryId], references: [id])
   images        Image[]
   favorites     Favorite[]
   attributes    Attribute[]
   features      Feature[]
 
   @@index([userId])
-  @@index([categoryId])
+  @@index([category])
 }
 
 enum ListingStatus {
@@ -66,89 +75,6 @@ enum ListingAction {
   RENT
 }
 
-model Category {
-  id            String     @id @default(cuid())
-  name          String
-  slug          String     @unique
-  description   String?
-  parentId      String?    // For subcategories
-  parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children      Category[] @relation("CategoryHierarchy")
-  listings      Listing[]
-  attributes    AttributeDefinition[]
-  features      FeatureDefinition[]
-
-  @@index([parentId])
-}
-
-// Flexible Attributes System
-model AttributeDefinition {
-  id            String    @id @default(cuid())
-  name          String
-  label         String
-  type          AttributeType
-  required      Boolean   @default(false)
-  options       String[]  // For dropdown/multi-select options
-  section       String    // e.g., "essential", "performance", "comfort"
-  categoryId    String
-  category      Category  @relation(fields: [categoryId], references: [id])
-  attributes    Attribute[]
-  order         Int       @default(0)
-
-  @@unique([categoryId, name])
-  @@index([categoryId])
-}
-
-model Attribute {
-  id                    String              @id @default(cuid())
-  value                 String              // Stored as string, converted as needed
-  listingId            String
-  listing              Listing             @relation(fields: [listingId], references: [id])
-  attributeDefinitionId String
-  attributeDefinition  AttributeDefinition @relation(fields: [attributeDefinitionId], references: [id])
-
-  @@unique([listingId, attributeDefinitionId])
-  @@index([listingId])
-  @@index([attributeDefinitionId])
-}
-
-enum AttributeType {
-  TEXT
-  NUMBER
-  SELECT
-  MULTISELECT
-  CHECKBOX
-  DATE
-  COLORPICKER
-}
-
-// Features System
-model FeatureDefinition {
-  id          String    @id @default(cuid())
-  name        String
-  label       String
-  categoryId  String
-  category    Category  @relation(fields: [categoryId], references: [id])
-  features    Feature[]
-
-  @@unique([categoryId, name])
-  @@index([categoryId])
-}
-
-model Feature {
-  id                  String            @id @default(cuid())
-  value               Boolean          @default(true)
-  listingId          String
-  listing            Listing           @relation(fields: [listingId], references: [id])
-  featureDefinitionId String
-  featureDefinition  FeatureDefinition @relation(fields: [featureDefinitionId], references: [id])
-
-  @@unique([listingId, featureDefinitionId])
-  @@index([listingId])
-  @@index([featureDefinitionId])
-}
-
-// Image handling
 model Image {
   id        String   @id @default(cuid())
   url       String
@@ -159,7 +85,6 @@ model Image {
   @@index([listingId])
 }
 
-// Favorites system
 model Favorite {
   id        String   @id @default(cuid())
   userId    String
@@ -170,5 +95,85 @@ model Favorite {
 
   @@unique([userId, listingId])
   @@index([userId])
+  @@index([listingId])
+}
+
+// Messaging System
+model Conversation {
+  id            String    @id @default(cuid())
+  participants  String[]
+  lastMessage   String?
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  users         User[]    @relation("UserConversations")
+  messages      Message[]
+
+  @@index([participants])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  content        String
+  createdAt      DateTime     @default(now())
+  read           Boolean      @default(false)
+  
+  // Relations
+  senderId       String
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId     String
+  receiver       User         @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([conversationId])
+}
+
+// Notification System
+model Notification {
+  id          String           @id @default(cuid())
+  type        NotificationType
+  content     String
+  read        Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  
+  // Relations
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  relatedId   String?         // Could be listingId, messageId, etc.
+
+  @@index([userId])
+}
+
+enum NotificationType {
+  NEW_MESSAGE
+  LISTING_INTEREST
+  PRICE_UPDATE
+  LISTING_SOLD
+  SYSTEM_NOTICE
+}
+
+// Flexible Attributes System
+model Attribute {
+  id          String   @id @default(cuid())
+  name        String
+  value       String
+  listingId   String
+  listing     Listing  @relation(fields: [listingId], references: [id])
+
+  @@index([listingId])
+}
+
+model Feature {
+  id          String   @id @default(cuid())
+  name        String
+  value       Boolean  @default(false)
+  listingId   String
+  listing     Listing  @relation(fields: [listingId], references: [id])
+
   @@index([listingId])
 }

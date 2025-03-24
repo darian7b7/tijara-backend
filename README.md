@@ -8,7 +8,7 @@ This is the backend for the Tijara marketplace, responsible for managing user au
 - Listings management (create, update, delete)
 - Secure API using JWT
 - Cloudflare R2 for image storage
-- Database support (MongoDB, PostgreSQL)
+- Database support (PostgreSQL)
 
 ## Installation
 

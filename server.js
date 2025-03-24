@@ -1,12 +1,12 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { PrismaClient } from "@prisma/client";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import connectDB from "./config/database.js";
 import authRoutes from "./routes/auth.routes.js";
 import listingRoutes from "./routes/listing.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -18,6 +18,7 @@ import errorHandler from "./middleware/errorHandler.js";
 dotenv.config();
 
 const app = express();
+const prisma = new PrismaClient();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -78,15 +79,18 @@ app.use(errorHandler);
 
 // ✅ Start Server
 const PORT = process.env.PORT || 5001; // Changed default port to 5001
-const startServer = async () => {
+async function startServer() {
   try {
-    await connectDB();
+    // Test database connection
+    await prisma.$connect();
+    console.log("✅ Connected to database successfully");
+
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
   }
-};
+}
 
 startServer();
