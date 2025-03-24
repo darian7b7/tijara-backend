@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, "Please add a username"],
     unique: true,
-    trim: true
+    trim: true,
   },
   email: {
     type: String,
@@ -14,55 +14,55 @@ const userSchema = new mongoose.Schema({
     unique: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-      "Please add a valid email"
-    ]
+      "Please add a valid email",
+    ],
   },
   password: {
     type: String,
     required: [true, "Please add a password"],
     minlength: 6,
-    select: false
+    select: false,
   },
   profilePicture: {
     type: String,
-    default: "https://via.placeholder.com/150"
+    default: "https://via.placeholder.com/150",
   },
   bio: {
     type: String,
-    maxlength: 500
+    maxlength: 500,
   },
   location: {
     type: String,
-    default: "" // Users can set their city/country
+    default: "", // Users can set their city/country
   },
   showLocation: {
     type: Boolean,
-    default: true // Users can choose whether to display their location
+    default: true, // Users can choose whether to display their location
   },
   preferences: {
     type: Object,
     default: {
-      language: "en"
-    }
+      language: "en",
+    },
   },
   autoLogoutTime: {
     type: Number,
-    default: 0 // 0 = Never, 1 = 1 Hour, 12 = 12 Hours, 24 = 24 Hours
+    default: 0, // 0 = Never, 1 = 1 Hour, 12 = 12 Hours, 24 = 24 Hours
   },
   lastLogin: {
     type: Date,
-    default: null // Tracks the last login date
+    default: null, // Tracks the last login date
   },
   createdAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 // Hash password before saving to DB (only if modified)
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();

@@ -1,31 +1,33 @@
 // backend/models/conversation.model.js
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const conversationSchema = new mongoose.Schema({
-  participants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }],
+  participants: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+  ],
   listing: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Listing',
-    required: true
+    ref: "Listing",
+    required: true,
   },
   lastMessage: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
+    ref: "Message",
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
-const Conversation = mongoose.model('Conversation', conversationSchema);
+const Conversation = mongoose.model("Conversation", conversationSchema);
 
 export default Conversation;

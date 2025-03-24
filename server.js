@@ -14,7 +14,7 @@ import messageRoutes from "./routes/message.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import uploadRoutes from "./routes/uploads.js";
 import errorHandler from "./middleware/errorHandler.js";
- 
+
 dotenv.config();
 
 const app = express();
@@ -32,7 +32,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  })
+  }),
 );
 
 app.use(helmet());
@@ -41,11 +41,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // ✅ Ensure All Routes Use `/api` Prefix
-app.use('/api/auth', authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/listings", listingRoutes);
-app.use("/api/messages", messageRoutes);
+app.use("/api/messaging", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/uploads", uploadRoutes);
 
@@ -72,7 +77,7 @@ app.set("io", io);
 app.use(errorHandler);
 
 // ✅ Start Server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001; // Changed default port to 5001
 const startServer = async () => {
   try {
     await connectDB();

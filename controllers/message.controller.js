@@ -1,5 +1,5 @@
-import Message from '../models/Message.js';
-import Conversation from '../models/conversation.model.js';
+import Message from "../models/Message.js";
+import Conversation from "../models/conversation.model.js";
 
 export const sendMessage = async (req, res) => {
   try {
@@ -9,13 +9,13 @@ export const sendMessage = async (req, res) => {
     // Find or create conversation
     let conversation = await Conversation.findOne({
       listing: listingId,
-      participants: { $all: [senderId, receiverId] }
+      participants: { $all: [senderId, receiverId] },
     });
 
     if (!conversation) {
       conversation = await Conversation.create({
         listing: listingId,
-        participants: [senderId, receiverId]
+        participants: [senderId, receiverId],
       });
     }
 
@@ -27,7 +27,7 @@ export const sendMessage = async (req, res) => {
     });
 
     // Populate sender details
-    await message.populate('sender', 'username profilePicture');
+    await message.populate("sender", "username profilePicture");
 
     // Update conversation's last message
     conversation.lastMessage = message._id;
@@ -43,12 +43,12 @@ export const sendMessage = async (req, res) => {
 export const getConversations = async (req, res) => {
   try {
     const conversations = await Conversation.find({
-      participants: req.user._id
+      participants: req.user._id,
     })
-      .populate('listing', 'title images')
-      .populate('participants', 'username profilePicture')
-      .populate('lastMessage')
-      .sort('-updatedAt');
+      .populate("listing", "title images")
+      .populate("participants", "username profilePicture")
+      .populate("lastMessage")
+      .sort("-updatedAt");
 
     res.json(conversations);
   } catch (error) {
@@ -60,11 +60,11 @@ export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const messages = await Message.find({ conversation: conversationId })
-      .populate('sender', 'username profilePicture')
-      .sort('createdAt');
+      .populate("sender", "username profilePicture")
+      .sort("createdAt");
 
     res.json(messages);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-}; 
+};

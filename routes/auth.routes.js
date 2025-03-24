@@ -1,7 +1,12 @@
 import express from "express";
 import { body } from "express-validator";
 import { protect } from "../middleware/auth.js";
-import { getMe, login, register, logout } from "../controllers/auth.controller.js";
+import {
+  getMe,
+  login,
+  register,
+  logout,
+} from "../controllers/auth.controller.js";
 
 const router = express.Router();
 
@@ -11,9 +16,11 @@ router.post(
   [
     body("username").trim().notEmpty().withMessage("Username is required"),
     body("email").isEmail().withMessage("Please enter a valid email"),
-    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
+    body("password")
+      .isLength({ min: 6 })
+      .withMessage("Password must be at least 6 characters"),
   ],
-  register
+  register,
 );
 
 // ✅ Login Route with Validation
@@ -23,7 +30,7 @@ router.post(
     body("email").isEmail().withMessage("Please enter a valid email"),
     body("password").notEmpty().withMessage("Password is required"),
   ],
-  login
+  login,
 );
 
 // ✅ Logout Route (Clears HTTP-only cookie)

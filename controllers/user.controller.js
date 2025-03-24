@@ -17,7 +17,9 @@ export const getUserProfile = async (req, res) => {
 
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: "Error fetching user profile", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching user profile", error: error.message });
   }
 };
 
@@ -39,7 +41,9 @@ export const updateProfile = async (req, res) => {
 
     // ✅ Validate password strength if changed
     if (req.body.password && req.body.password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
     }
 
     // ✅ Update fields if provided
@@ -59,7 +63,9 @@ export const updateProfile = async (req, res) => {
       if (result?.secure_url) {
         user.profilePicture = result.secure_url;
       } else {
-        return res.status(500).json({ message: "Error uploading profile picture" });
+        return res
+          .status(500)
+          .json({ message: "Error uploading profile picture" });
       }
     }
 
@@ -72,9 +78,10 @@ export const updateProfile = async (req, res) => {
       profilePicture: updatedUser.profilePicture,
       bio: updatedUser.bio,
     });
-
   } catch (error) {
-    res.status(500).json({ message: "Error updating profile", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error updating profile", error: error.message });
   }
 };
 
@@ -89,12 +96,17 @@ export const getUserListings = async (req, res) => {
 
     console.log("Fetching listings for user:", req.user._id);
 
-    const listings = await Listing.find({ seller: req.user._id }).populate("seller", "username email");
+    const listings = await Listing.find({ seller: req.user._id }).populate(
+      "seller",
+      "username email",
+    );
 
     console.log("Listings found:", listings);
 
     if (!listings.length) {
-      return res.status(200).json({ message: "No listings found", listings: [] });
+      return res
+        .status(200)
+        .json({ message: "No listings found", listings: [] });
     }
 
     res.json({ listings });
@@ -103,7 +115,6 @@ export const getUserListings = async (req, res) => {
     res.status(500).json({ message: "Server error fetching listings" });
   }
 };
-
 
 /**
  * ✅ Delete a user account
@@ -124,7 +135,9 @@ export const deleteUser = async (req, res) => {
 
     res.json({ message: "Account deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting account", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error deleting account", error: error.message });
   }
 };
 
@@ -141,7 +154,9 @@ export const getUserSettings = async (req, res) => {
 
     res.json(user.preferences);
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving settings", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error retrieving settings", error: error.message });
   }
 };
 
@@ -160,6 +175,8 @@ export const updateUserSettings = async (req, res) => {
     await user.save();
     res.json({ message: "Settings updated successfully", user });
   } catch (error) {
-    res.status(500).json({ message: "Error updating settings", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error updating settings", error: error.message });
   }
 };

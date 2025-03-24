@@ -1,0 +1,174 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+// Main Models
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  listings      Listing[]
+  favorites     Favorite[]
+  role          UserRole  @default(USER)
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Listing {
+  id            String         @id @default(cuid())
+  title         String
+  description   String
+  price         Decimal        @db.Decimal(10, 2)
+  location      String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  status        ListingStatus  @default(ACTIVE)
+  listingAction ListingAction  @default(SELL)
+  
+  // Relations
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id])
+  images        Image[]
+  favorites     Favorite[]
+  attributes    Attribute[]
+  features      Feature[]
+
+  @@index([userId])
+  @@index([categoryId])
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  SOLD
+  RENTED
+  EXPIRED
+  ARCHIVED
+}
+
+enum ListingAction {
+  SELL
+  RENT
+}
+
+model Category {
+  id            String     @id @default(cuid())
+  name          String
+  slug          String     @unique
+  description   String?
+  parentId      String?    // For subcategories
+  parent        Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children      Category[] @relation("CategoryHierarchy")
+  listings      Listing[]
+  attributes    AttributeDefinition[]
+  features      FeatureDefinition[]
+
+  @@index([parentId])
+}
+
+// Flexible Attributes System
+model AttributeDefinition {
+  id            String    @id @default(cuid())
+  name          String
+  label         String
+  type          AttributeType
+  required      Boolean   @default(false)
+  options       String[]  // For dropdown/multi-select options
+  section       String    // e.g., "essential", "performance", "comfort"
+  categoryId    String
+  category      Category  @relation(fields: [categoryId], references: [id])
+  attributes    Attribute[]
+  order         Int       @default(0)
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+}
+
+model Attribute {
+  id                    String              @id @default(cuid())
+  value                 String              // Stored as string, converted as needed
+  listingId            String
+  listing              Listing             @relation(fields: [listingId], references: [id])
+  attributeDefinitionId String
+  attributeDefinition  AttributeDefinition @relation(fields: [attributeDefinitionId], references: [id])
+
+  @@unique([listingId, attributeDefinitionId])
+  @@index([listingId])
+  @@index([attributeDefinitionId])
+}
+
+enum AttributeType {
+  TEXT
+  NUMBER
+  SELECT
+  MULTISELECT
+  CHECKBOX
+  DATE
+  COLORPICKER
+}
+
+// Features System
+model FeatureDefinition {
+  id          String    @id @default(cuid())
+  name        String
+  label       String
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id])
+  features    Feature[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+}
+
+model Feature {
+  id                  String            @id @default(cuid())
+  value               Boolean          @default(true)
+  listingId          String
+  listing            Listing           @relation(fields: [listingId], references: [id])
+  featureDefinitionId String
+  featureDefinition  FeatureDefinition @relation(fields: [featureDefinitionId], references: [id])
+
+  @@unique([listingId, featureDefinitionId])
+  @@index([listingId])
+  @@index([featureDefinitionId])
+}
+
+// Image handling
+model Image {
+  id        String   @id @default(cuid())
+  url       String
+  order     Int      @default(0)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id])
+
+  @@index([listingId])
+}
+
+// Favorites system
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+}

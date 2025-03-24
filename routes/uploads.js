@@ -14,16 +14,20 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
-    
+
     const { category } = req.body; // Pass category from frontend ("avatar" or "listing")
     if (!category || (category !== "avatar" && category !== "listing")) {
-      return res.status(400).json({ error: "Invalid category. Use 'avatar' or 'listing'." });
+      return res
+        .status(400)
+        .json({ error: "Invalid category. Use 'avatar' or 'listing'." });
     }
 
     const imageUrl = await uploadToR2(req.file, category);
     res.json({ imageUrl });
   } catch (error) {
-    res.status(500).json({ error: "Image upload failed", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Image upload failed", details: error.message });
   }
 });
 
@@ -40,7 +44,9 @@ router.delete("/delete", async (req, res) => {
     const fileKey = imageUrl.replace(`${CLOUDFLARE_PUBLIC_URL}/`, "");
 
     // Delete from R2
-    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: fileKey }));
+    await s3.send(
+      new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: fileKey }),
+    );
 
     res.json({ success: true, message: "Image deleted successfully" });
   } catch (error) {

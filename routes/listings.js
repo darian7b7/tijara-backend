@@ -118,4 +118,4 @@ router.put('/:id', protect, updateListing);
 router.delete('/delete-image', auth, deleteImage);
 router.delete('/:id', auth, deleteListing);
 
-module.exports = router;
+export interface Message {  }

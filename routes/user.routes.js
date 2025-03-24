@@ -6,9 +6,13 @@ import {
   getUserProfile,
   getUserSettings,
   updateUserSettings,
-  getUserListings
+  getUserListings,
 } from "../controllers/user.controller.js";
-import { upload, processImage, uploadToR2 } from "../middleware/upload.middleware.js";
+import {
+  upload,
+  processImage,
+  uploadToR2,
+} from "../middleware/upload.middleware.js";
 
 const router = express.Router();
 
@@ -32,7 +36,12 @@ router.use(protect);
 router.get("/profile", getUserProfile);
 
 // ✅ Update profile (optional profile picture upload)
-router.put("/profile", upload.single("profilePicture"), processProfilePicture, updateProfile);
+router.put(
+  "/profile",
+  upload.single("profilePicture"),
+  processProfilePicture,
+  updateProfile,
+);
 
 // ✅ Get user settings
 router.get("/settings", async (req, res) => {
@@ -41,13 +50,13 @@ router.get("/settings", async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    
+
     // Initialize preferences if they don't exist
     if (!user.preferences) {
       user.preferences = { language: "en" };
       await user.save();
     }
-    
+
     res.json(user);
   } catch (error) {
     console.error("Error getting settings:", error);
@@ -76,7 +85,7 @@ router.post("/settings", async (req, res) => {
     await user.save();
     res.json({
       message: "Settings updated successfully",
-      preferences: user.preferences
+      preferences: user.preferences,
     });
   } catch (error) {
     console.error("Error updating settings:", error);
