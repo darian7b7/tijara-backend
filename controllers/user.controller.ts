@@ -285,7 +285,7 @@ export const updateUserSettings = async (req: AuthRequest, res: Response) => {
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data: {
-        preferences: preferencesJson
+        preferences: preferencesJson as Prisma.InputJsonValue
       }
     });
 

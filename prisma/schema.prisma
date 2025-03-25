@@ -121,6 +121,11 @@ model Message {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   createdAt      DateTime     @default(now())
+  read           Boolean      @default(false)
+
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([conversationId])
 }
 
 // Notification System
