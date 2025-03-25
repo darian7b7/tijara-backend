@@ -58,11 +58,21 @@ router.get('/', async (req, res) => {
     console.log('Query:', query); // Debug log
     console.log('Sort:', sortOptions); // Debug log
 
-    const listings = await Listing.find(query)
-      .sort(sortOptions)
-      .limit(Number(limit))
-      .skip((Number(page) - 1) * Number(limit))
-      .populate('seller', 'username profilePicture');
+    const listings = await prisma.listing.findMany({
+      where: query,
+      orderBy: sortOptions,
+      include: {
+        seller: {
+          select: {
+            id: true,
+            username: true,
+            profilePicture: true
+          }
+        }
+      },
+      take: Number(limit),
+      skip: (Number(page) - 1) * Number(limit)
+    });
 
     // Double-check mainCategory filter
     const filteredListings = listings.filter(

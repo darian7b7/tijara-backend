@@ -20,7 +20,12 @@ export const register = async (req, res) => {
     const { username, email, password } = req.body;
 
     const existingUser = await prisma.user.findFirst({
-      where: { $or: [{ email }, { username }] },
+      where: {
+        OR: [
+          { email },
+          { username }
+        ]
+      }
     });
     if (existingUser) {
       return res.status(400).json({
@@ -32,14 +37,16 @@ export const register = async (req, res) => {
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await User.create({
-      username,
-      email,
-      password: hashedPassword,
+    const user = await prisma.user.create({
+      data: {
+        username,
+        email,
+        password: hashedPassword,
+      }
     });
 
-    const accessToken = signToken(user._id);
-    const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    const accessToken = signToken(user.id);
+    const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "30d", // Refresh token valid for 30 days
     });
 
@@ -47,7 +54,7 @@ export const register = async (req, res) => {
       success: true,
       data: {
         user: {
-          _id: user._id,
+          id: user.id,
           username: user.username,
           email: user.email,
           profilePicture: user.profilePicture,
@@ -80,7 +87,16 @@ export const login = async (req, res) => {
 
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email }).select("+password");
+    const user = await prisma.user.findFirst({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        username: true,
+        profilePicture: true
+      }
+    });
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -96,8 +112,8 @@ export const login = async (req, res) => {
       });
     }
 
-    const accessToken = signToken(user._id);
-    const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    const accessToken = signToken(user.id);
+    const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: "30d", // Refresh token valid for 30 days
     });
 
@@ -105,7 +121,7 @@ export const login = async (req, res) => {
       success: true,
       data: {
         user: {
-          _id: user._id,
+          id: user.id,
           username: user.username,
           email: user.email,
           profilePicture: user.profilePicture,
@@ -143,7 +159,7 @@ export const getMe = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user._id).select("-password");
+    const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: "-password" });
     if (!user) {
       return res.status(404).json({
         success: false,

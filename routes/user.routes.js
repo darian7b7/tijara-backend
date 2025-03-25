@@ -47,7 +47,7 @@ router.put(
 // ✅ Get user settings
 router.get("/settings", async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("preferences");
+    const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: "preferences" });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -69,7 +69,7 @@ router.get("/settings", async (req, res) => {
 router.post("/settings", async (req, res) => {
   try {
     const { preferences } = req.body;
-    const user = await User.findById(req.user._id);
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
 
     if (!user) return res.status(404).json({ message: "User not found" });
 

@@ -8,9 +8,9 @@ const formatListingResponse = (listing) => {
   const formatted = listing.toObject ? listing.toObject() : { ...listing };
   return {
     ...formatted,
-    id: formatted._id.toString(),
+    id: formatted.id.toString(),
     seller: formatted.seller ? {
-      id: formatted.seller._id?.toString(),
+      id: formatted.seller.id.toString(),
       username: formatted.seller.username,
       profilePicture: formatted.seller.profilePicture,
     } : null,
@@ -158,9 +158,9 @@ export const createListing = async (req, res) => {
     // Create notification for the listing
     await createNotification(
       req.app.get("io"),
-      listing.seller._id,
+      listing.seller,
       "save",
-      listing._id,
+      listing.id,
       `Your listing "${listing.title}" has been created successfully.`,
       "New Listing Created"
     );
@@ -204,13 +204,24 @@ export const getListings = async (req, res) => {
     }[sort] || { createdAt: -1 };
 
     const [listings, total] = await Promise.all([
-      Listing.find(query)
-        .populate("seller", "username profilePicture")
-        .sort(sortOptions)
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      Listing.countDocuments(query),
+      prisma.listing.findMany({
+        where: query,
+        include: {
+          seller: {
+            select: {
+              id: true,
+              username: true,
+              profilePicture: true
+            }
+          }
+        },
+        orderBy: sortOptions,
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      prisma.listing.count({
+        where: query
+      }),
     ]);
 
     res.json({
@@ -279,13 +290,24 @@ export const searchListings = async (req, res) => {
     }[sortBy] || { createdAt: -1 };
 
     const [listings, total] = await Promise.all([
-      Listing.find(query)
-        .populate("seller", "username profilePicture")
-        .sort(sortOptions)
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      Listing.countDocuments(query),
+      prisma.listing.findMany({
+        where: query,
+        include: {
+          seller: {
+            select: {
+              id: true,
+              username: true,
+              profilePicture: true
+            }
+          }
+        },
+        orderBy: sortOptions,
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      prisma.listing.count({
+        where: query
+      }),
     ]);
 
     res.json({
@@ -317,9 +339,18 @@ export const searchListings = async (req, res) => {
 
 export const getListingById = async (req, res) => {
   try {
-    const listing = await Listing.findById(req.params.id)
-      .populate("seller", "username profilePicture")
-      .lean();
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: {
+        seller: {
+          select: {
+            id: true,
+            username: true,
+            profilePicture: true
+          }
+        }
+      }
+    });
 
     if (!listing) {
       return res.status(404).json({
@@ -329,18 +360,23 @@ export const getListingById = async (req, res) => {
     }
 
     // Increment views
-    await Listing.findByIdAndUpdate(req.params.id, {
-      $inc: { views: 1 },
-      $set: { updatedAt: new Date() },
+    await prisma.listing.update({
+      where: { id: req.params.id },
+      data: {
+        views: {
+          increment: 1
+        },
+        updatedAt: new Date()
+      }
     });
 
     // Create notification for listing owner about the view
-    if (req.user && req.user._id.toString() !== listing.seller._id.toString()) {
+    if (req.user && req.user._id.toString() !== listing.seller.toString()) {
       await createNotification(
         req.app.get("io"),
-        listing.seller._id,
-        "view",  // Changed from "listing" to "view" to match schema
-        listing._id,
+        listing.seller,
+        "view",
+        listing.id,
         `Someone viewed your listing: ${listing.title}`,
         "New View"
       );
@@ -362,9 +398,11 @@ export const getListingById = async (req, res) => {
 
 export const updateListing = async (req, res) => {
   try {
-    const listing = await Listing.findOne({
-      _id: req.params.id,
-      seller: req.user._id,
+    const listing = await prisma.listing.findFirst({
+      where: {
+        id: req.params.id,
+        seller: req.user._id
+      }
     });
 
     if (!listing) {
@@ -393,13 +431,19 @@ export const updateListing = async (req, res) => {
       updatedAt: new Date(),
     };
 
-    const updatedListing = await Listing.findByIdAndUpdate(
-      req.params.id,
-      { $set: updates },
-      { new: true }
-    )
-      .populate("seller", "username profilePicture")
-      .lean();
+    const updatedListing = await prisma.listing.update({
+      where: { id: req.params.id },
+      data: updates,
+      include: {
+        seller: {
+          select: {
+            id: true,
+            username: true,
+            profilePicture: true
+          }
+        }
+      }
+    });
 
     res.json({
       success: true,
@@ -417,9 +461,11 @@ export const updateListing = async (req, res) => {
 
 export const deleteListing = async (req, res) => {
   try {
-    const listing = await Listing.findOne({
-      _id: req.params.id,
-      seller: req.user._id,
+    const listing = await prisma.listing.findFirst({
+      where: {
+        id: req.params.id,
+        seller: req.user._id
+      }
     });
 
     if (!listing) {
@@ -442,7 +488,9 @@ export const deleteListing = async (req, res) => {
       );
     }
 
-    await listing.remove();
+    await prisma.listing.delete({
+      where: { id: req.params.id }
+    });
 
     res.json({
       success: true,
@@ -465,13 +513,26 @@ export const getUserListings = async (req, res) => {
     const userId = req.params.userId || req.user._id;
 
     const [listings, total] = await Promise.all([
-      Listing.find({ seller: userId })
-        .populate("seller", "username profilePicture")
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      Listing.countDocuments({ seller: userId }),
+      prisma.listing.findMany({
+        where: { seller: userId },
+        include: {
+          seller: {
+            select: {
+              id: true,
+              username: true,
+              profilePicture: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      prisma.listing.count({
+        where: { seller: userId }
+      }),
     ]);
 
     res.json({
@@ -503,7 +564,18 @@ export const getUserListings = async (req, res) => {
 
 export const saveListing = async (req, res) => {
   try {
-    const listing = await Listing.findById(req.params.id);
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: {
+        seller: {
+          select: {
+            id: true,
+            username: true,
+            profilePicture: true
+          }
+        }
+      }
+    });
     if (!listing) {
       return res.status(404).json({ message: "Listing not found" });
     }
@@ -511,15 +583,21 @@ export const saveListing = async (req, res) => {
     // Add to saved array if not already saved
     if (!listing.savedBy) listing.savedBy = [];
     if (!listing.savedBy.includes(req.user._id)) {
-      listing.savedBy.push(req.user._id);
-      await listing.save();
+      await prisma.listing.update({
+        where: { id: req.params.id },
+        data: {
+          savedBy: {
+            set: [...listing.savedBy, req.user._id]
+          }
+        }
+      });
 
       // Notify listing owner
       await createNotification(
         req.app.get("io"),
-        listing.userId,
+        listing.seller,
         "save",
-        listing._id,
+        listing.id,
         `Someone saved your listing: ${listing.title}`,
       );
     }
@@ -532,17 +610,34 @@ export const saveListing = async (req, res) => {
 
 export const unsaveListing = async (req, res) => {
   try {
-    const listing = await Listing.findById(req.params.id);
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      include: {
+        seller: {
+          select: {
+            id: true,
+            username: true,
+            profilePicture: true
+          }
+        }
+      }
+    });
     if (!listing) {
       return res.status(404).json({ message: "Listing not found" });
     }
 
     // Remove from saved array
     if (listing.savedBy) {
-      listing.savedBy = listing.savedBy.filter(
-        (userId) => userId.toString() !== req.user._id.toString(),
-      );
-      await listing.save();
+      await prisma.listing.update({
+        where: { id: req.params.id },
+        data: {
+          savedBy: {
+            set: listing.savedBy.filter(
+              (userId) => userId.toString() !== req.user._id.toString(),
+            )
+          }
+        }
+      });
     }
 
     res.json({ message: "Listing removed from saved" });
@@ -553,8 +648,21 @@ export const unsaveListing = async (req, res) => {
 
 export const getSavedListings = async (req, res) => {
   try {
-    const listings = await Listing.find({
-      savedBy: req.user._id, // Ensure user ID is used, not "saved" as a string
+    const listings = await prisma.listing.findMany({
+      where: {
+        savedBy: {
+          has: req.user._id
+        }
+      },
+      include: {
+        seller: {
+          select: {
+            id: true,
+            username: true,
+            profilePicture: true
+          }
+        }
+      }
     });
     res.json(listings);
   } catch (error) {
@@ -565,9 +673,21 @@ export const getSavedListings = async (req, res) => {
 
 export const getPopularListings = async (req, res) => {
   try {
-    const listings = await Listing.find()
-      .sort({ views: -1, "savedBy.length": -1 })
-      .limit(10);
+    const listings = await prisma.listing.findMany({
+      orderBy: {
+        views: 'desc'
+      },
+      take: 10,
+      include: {
+        seller: {
+          select: {
+            id: true,
+            username: true,
+            profilePicture: true
+          }
+        }
+      }
+    });
     res.json(listings);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -576,9 +696,21 @@ export const getPopularListings = async (req, res) => {
 
 export const getTrendingListings = async (req, res) => {
   try {
-    const trendingListings = await Listing.find()
-      .sort({ views: -1 }) // Sort by views or any other metric
-      .limit(10); // Limit to top 10
+    const trendingListings = await prisma.listing.findMany({
+      orderBy: {
+        views: 'desc'
+      },
+      take: 10,
+      include: {
+        seller: {
+          select: {
+            id: true,
+            username: true,
+            profilePicture: true
+          }
+        }
+      }
+    });
     res.json(trendingListings);
   } catch (error) {
     res.status(500).json({ message: "Error fetching trending listings" });
