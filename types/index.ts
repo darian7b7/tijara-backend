@@ -40,5 +40,7 @@ export interface ConversationData {
   listingId?: string;
 }
 
-export type JsonNullValueInput = Prisma.JsonNullValueInput;
+export type preferences = null
+
+
 export type InputJsonValue = Prisma.InputJsonValue;

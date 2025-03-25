@@ -25,6 +25,8 @@ model User {
   
   // Relations
   listings      Listing[]
+  listing       Listing?      @relation(fields: [listingId], references: [id])
+  listingId     String?
   favorites     Favorite[]
   sentMessages     Message[]        @relation("SentMessages")
   receivedMessages Message[]        @relation("ReceivedMessages")

@@ -7,12 +7,19 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     const { receiverId, content, listingId } = req.body;
     const senderId = req.user.id;
 
-    // Find or create conversation
     let conversation = await prisma.conversation.findFirst({
       where: {
         AND: [
-          { participants: { hasEvery: [senderId, receiverId] } },
-          { listing: { is: { id: listingId } } }
+          { 
+            participants: {
+              every: {
+                id: { in: [senderId, receiverId] }
+              }
+            }
+          },
+          { 
+            listingId: listingId 
+          }
         ],
       },
     });
@@ -38,9 +45,15 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     const message = await prisma.message.create({
       data: {
         content,
-        senderId,
-        receiverId,
-        conversationId: conversation.id,
+        sender: {
+          connect: { id: senderId }
+        },
+        recipient: {
+          connect: { id: receiverId }
+        },
+        conversation: {
+          connect: { id: conversation.id }
+        }
       },
       include: {
         sender: {

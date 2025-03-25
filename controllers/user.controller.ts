@@ -1,10 +1,10 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import prisma from "../lib/prismaClient.js";
 import bcrypt from "bcryptjs";
 import validator from "validator";
 import { uploadToR2 } from "../config/cloudflareR2.js";
 import { Prisma, User } from "@prisma/client";
-import { AuthRequest, UserPreferences, JsonNullValueInput, InputJsonValue } from "../types/index.js";
+import { AuthRequest, UserPreferences, InputJsonValue } from "../types/index.js";
 
 interface UpdateData {
   email?: string;
@@ -269,18 +269,24 @@ export const updateUserSettings = async (req: AuthRequest, res: Response) => {
   try {
     const { preferences } = req.body as { preferences: UserPreferences };
 
-    const updateData: Prisma.UserUpdateInput = {
-      userPreferences: {
-        upsert: {
-          create: { data: preferences as Prisma.InputJsonValue },
-          update: { data: preferences as Prisma.InputJsonValue }
-        }
-      }
-    };
+    // Validate preferences structure
+    if (!preferences || typeof preferences !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid preferences format',
+        status: 400,
+        data: null
+      });
+    }
+
+    // Convert preferences to Prisma.JsonValue
+    const preferencesJson = preferences as unknown as Prisma.JsonValue;
 
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
-      data: updateData,
+      data: {
+        preferences: preferencesJson
+      },
     }) as UserWithPreferences;
 
     res.status(200).json({
