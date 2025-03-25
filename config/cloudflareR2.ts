@@ -1,4 +1,4 @@
-// cloudflareR2.js - Replaces cloudinary.js for Cloudflare R2
+// Cloudflare R2
 import {
   S3Client,
   PutObjectCommand,

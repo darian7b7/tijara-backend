@@ -8,7 +8,7 @@ const router = express.Router();
 const BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET;
 const CLOUDFLARE_PUBLIC_URL = process.env.CLOUDFLARE_R2_PUBLIC_URL;
 
-// ✅ Upload Image to Cloudflare R2
+// Upload Image to Cloudflare R2
 router.post("/upload", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -32,7 +32,7 @@ router.post("/upload", upload.single("image"), async (req, res) => {
   }
 });
 
-// ✅ DELETE Image from Cloudflare R2
+// DELETE Image from Cloudflare R2
 router.delete("/delete", async (req, res) => {
   try {
     const { imageUrl } = req.body;

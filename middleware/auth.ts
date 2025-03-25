@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
-import prisma from "../lib/prismaClient";
+import prisma from "../lib/prismaClient.js";
 
 // Custom type for Request with user
 declare global {

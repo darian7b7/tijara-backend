@@ -1,6 +1,8 @@
+import { Response } from "express";
 import prisma from "../lib/prismaClient.js";
+import { AuthRequest } from "../types/index.js";
 
-export const sendMessage = async (req, res) => {
+export const sendMessage = async (req: AuthRequest, res: Response) => {
   try {
     const { receiverId, content, listingId } = req.body;
     const senderId = req.user.id;
@@ -9,8 +11,8 @@ export const sendMessage = async (req, res) => {
     let conversation = await prisma.conversation.findFirst({
       where: {
         AND: [
-          { listingId },
           { participants: { hasEvery: [senderId, receiverId] } },
+          { listing: { is: { id: listingId } } }
         ],
       },
     });
@@ -18,8 +20,15 @@ export const sendMessage = async (req, res) => {
     if (!conversation) {
       conversation = await prisma.conversation.create({
         data: {
-          listingId,
-          participants: [senderId, receiverId],
+          participants: {
+            connect: [
+              { id: senderId },
+              { id: receiverId }
+            ]
+          },
+          listing: {
+            connect: { id: listingId }
+          },
           lastMessage: null,
           lastMessageAt: new Date(),
         },
@@ -66,7 +75,7 @@ export const sendMessage = async (req, res) => {
   }
 };
 
-export const getConversations = async (req, res) => {
+export const getConversations = async (req: AuthRequest, res: Response) => {
   try {
     const conversations = await prisma.conversation.findMany({
       where: {
@@ -100,11 +109,11 @@ export const getConversations = async (req, res) => {
   }
 };
 
-export const getMessages = async (req, res) => {
+export const getMessages = async (req: AuthRequest, res: Response) => {
   try {
     const { conversationId } = req.params;
-    const { page = 1, limit = 20 } = req.query;
-    const skip = (page - 1) * limit;
+    const { page = "1", limit = "20" } = req.query as { page?: string; limit?: string };
+    const skip = (Number(page) - 1) * Number(limit);
 
     const messages = await prisma.message.findMany({
       where: {
@@ -153,7 +162,7 @@ export const getMessages = async (req, res) => {
   }
 };
 
-export const deleteMessage = async (req, res) => {
+export const deleteMessage = async (req: AuthRequest, res: Response) => {
   try {
     const { messageId } = req.params;
 

@@ -1,22 +1,15 @@
 import { Request, Response } from "express";
 import { Prisma, NotificationType } from "@prisma/client";
 import prisma from "../lib/prismaClient.js";
-
-interface AuthRequest extends Request {
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    role: string;
-  };
-}
+import { Server } from "socket.io";
+import { AuthRequest } from "../types/index.js";
 
 const validateNotificationType = (type: string): type is NotificationType => {
   return Object.values(NotificationType).includes(type as NotificationType);
 };
 
 export const createNotification = async (
-  io: any,
+  io: Server,
   userId: string,
   type: NotificationType,
   relatedId: string,
@@ -49,123 +42,129 @@ export const createNotification = async (
 export const getNotifications = async (req: AuthRequest, res: Response) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 12));
-    const type = req.query.type as NotificationType;
+    const limit = Math.max(1, Math.min(50, parseInt(req.query.limit as string) || 20));
+    const skip = (page - 1) * limit;
 
-    const where: Prisma.NotificationWhereInput = {
-      userId: req.user.id,
-      ...(type && validateNotificationType(type) ? { type } : {}),
-    };
+    const notifications = await prisma.notification.findMany({
+      where: {
+        userId: req.user.id,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      skip,
+      take: limit,
+    });
 
-    const [notifications, total] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.notification.count({ where }),
-    ]);
+    const total = await prisma.notification.count({
+      where: {
+        userId: req.user.id,
+      },
+    });
 
     res.json({
       success: true,
-      data: {
-        notifications,
-        total,
+      notifications,
+      pagination: {
         page,
         limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
-      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Error getting notifications:", error);
+    console.error("Get notifications error:", error);
     res.status(500).json({
       success: false,
-      message: "Error getting notifications",
-      timestamp: new Date().toISOString(),
+      error: "Failed to get notifications",
     });
   }
 };
 
 export const markAsRead = async (req: AuthRequest, res: Response) => {
   try {
-    const { notificationId } = req.params;
-    const notification = await prisma.notification.update({
-      where: { id: notificationId, userId: req.user.id },
-      data: { read: true },
+    const { id } = req.params;
+
+    const notification = await prisma.notification.findFirst({
+      where: {
+        id,
+        userId: req.user.id,
+      },
     });
 
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: "Notification not found",
-        timestamp: new Date().toISOString(),
+        error: "Notification not found",
       });
     }
 
+    await prisma.notification.update({
+      where: { id },
+      data: { read: true },
+    });
+
     res.json({
       success: true,
-      data: notification,
-      timestamp: new Date().toISOString(),
+      message: "Notification marked as read",
     });
   } catch (error) {
-    console.error("Error marking notification as read:", error);
+    console.error("Mark as read error:", error);
     res.status(500).json({
       success: false,
-      message: "Error marking notification as read",
-      timestamp: new Date().toISOString(),
+      error: "Failed to mark notification as read",
     });
   }
 };
 
 export const markAllAsRead = async (req: AuthRequest, res: Response) => {
   try {
-    const result = await prisma.notification.updateMany({
-      where: { userId: req.user.id, read: false },
-      data: { read: true },
+    await prisma.notification.updateMany({
+      where: {
+        userId: req.user.id,
+        read: false,
+      },
+      data: {
+        read: true,
+      },
     });
 
     res.json({
       success: true,
-      data: { modifiedCount: result.count },
-      timestamp: new Date().toISOString(),
+      message: "All notifications marked as read",
     });
   } catch (error) {
-    console.error("Error marking all notifications as read:", error);
+    console.error("Mark all as read error:", error);
     res.status(500).json({
       success: false,
-      message: "Error marking all notifications as read",
-      timestamp: new Date().toISOString(),
+      error: "Failed to mark all notifications as read",
     });
   }
 };
 
 export const deleteNotification = async (req: AuthRequest, res: Response) => {
   try {
-    const { notificationId } = req.params;
+    const { id } = req.params;
     const notification = await prisma.notification.delete({
-      where: { id: notificationId, userId: req.user.id },
+      where: { id, userId: req.user.id },
     });
 
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: "Notification not found",
-        timestamp: new Date().toISOString(),
+        error: "Notification not found",
       });
     }
 
     res.json({
       success: true,
-      data: notification,
-      timestamp: new Date().toISOString(),
+      message: "Notification deleted",
     });
   } catch (error) {
-    console.error("Error deleting notification:", error);
+    console.error("Delete notification error:", error);
     res.status(500).json({
       success: false,
-      message: "Error deleting notification",
-      timestamp: new Date().toISOString(),
+      error: "Failed to delete notification",
     });
   }
 };
@@ -178,15 +177,14 @@ export const clearAllNotifications = async (req: AuthRequest, res: Response) => 
 
     res.json({
       success: true,
-      data: { deletedCount: result.count },
-      timestamp: new Date().toISOString(),
+      message: "All notifications cleared",
+      deletedCount: result.count,
     });
   } catch (error) {
-    console.error("Error clearing all notifications:", error);
+    console.error("Clear all notifications error:", error);
     res.status(500).json({
       success: false,
-      message: "Error clearing all notifications",
-      timestamp: new Date().toISOString(),
+      error: "Failed to clear all notifications",
     });
   }
 };

@@ -72,7 +72,7 @@ app.use("/api/messaging", messageRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-// Serve images locally if not using Cloudinary
+// Serve images locally if not using Cloudflare
 app.use("/uploads", express.static("uploads"));
 
 // Health check endpoint
@@ -116,8 +116,12 @@ io.on("connection", (socket: Socket) => {
         const message = await prisma.message.create({
           data: {
             content: data.content,
-            senderId: data.senderId,
-            recipientId: data.recipientId,
+            sender: {
+              connect: { id: data.senderId }
+            },
+            recipient: {
+              connect: { id: data.recipientId }
+            }
           },
         });
 

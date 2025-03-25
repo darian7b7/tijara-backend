@@ -4,41 +4,15 @@ import bcrypt from "bcryptjs";
 import validator from "validator";
 import { uploadToR2 } from "../config/cloudflareR2.js";
 import { Prisma, User } from "@prisma/client";
+import { AuthRequest, UserPreferences, JsonNullValueInput, InputJsonValue } from "../types/index.js";
 
-interface AuthRequest extends Request {
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    role: string;
-  };
-  file?: Express.Multer.File;
-}
-
-interface UserPreferences {
-  language: string;
-  theme: 'light' | 'dark';
-  notifications: {
-    enabledTypes: string[];
-    emailNotifications: boolean;
-    pushNotifications: boolean;
-  };
-  emailPreferences: {
-    newMessages: boolean;
-    listingUpdates: boolean;
-    promotions: boolean;
-  };
-  autoLocalization: boolean;
-  country?: string;
-}
-
-interface UpdateData extends Prisma.UserUpdateInput {
+interface UpdateData {
   email?: string;
   username?: string;
   password?: string;
   bio?: string;
   profilePicture?: string;
-  preferences?: Prisma.JsonValue;
+  preferences?: Prisma.InputJsonValue;
 }
 
 interface UploadResult {
@@ -295,25 +269,18 @@ export const updateUserSettings = async (req: AuthRequest, res: Response) => {
   try {
     const { preferences } = req.body as { preferences: UserPreferences };
 
-    // Validate preferences structure
-    if (!preferences || typeof preferences !== 'object') {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid preferences format',
-        status: 400,
-        data: null
-      });
-    }
+    const updateData: Prisma.UserUpdateInput = {
+      userPreferences: {
+        upsert: {
+          create: { data: preferences as Prisma.InputJsonValue },
+          update: { data: preferences as Prisma.InputJsonValue }
+        }
+      }
+    };
 
-    // First convert to unknown, then to Prisma.JsonValue
-    const preferencesJson = JSON.parse(JSON.stringify(preferences)) as Prisma.JsonValue;
-
-    // Update user with preferences using Prisma's update operation
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
-      data: {
-        preferences: preferencesJson
-      },
+      data: updateData,
     }) as UserWithPreferences;
 
     res.status(200).json({
