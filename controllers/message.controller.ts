@@ -12,13 +12,13 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         AND: [
           { 
             participants: {
-              every: {
+              some: {
                 id: { in: [senderId, receiverId] }
               }
             }
           },
           { 
-            listingId: listingId 
+            listingId 
           }
         ],
       },
@@ -33,9 +33,7 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
               { id: receiverId }
             ]
           },
-          listing: {
-            connect: { id: listingId }
-          },
+          listingId,
           lastMessage: null,
           lastMessageAt: new Date(),
         },
@@ -45,15 +43,9 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     const message = await prisma.message.create({
       data: {
         content,
-        sender: {
-          connect: { id: senderId }
-        },
-        recipient: {
-          connect: { id: receiverId }
-        },
-        conversation: {
-          connect: { id: conversation.id }
-        }
+        senderId,
+        recipientId: receiverId,
+        conversationId: conversation.id
       },
       include: {
         sender: {

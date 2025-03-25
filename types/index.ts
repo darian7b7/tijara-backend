@@ -1,5 +1,5 @@
-import { Request, Response } from "express";
-import { Prisma } from "@prisma/client";
+import { Request } from 'express';
+import { Prisma } from '@prisma/client';
 
 export interface AuthRequest extends Request {
   user: {
@@ -8,7 +8,6 @@ export interface AuthRequest extends Request {
     username: string;
     role: string;
   };
-  file?: Express.Multer.File;
 }
 
 export interface UserPreferences {
@@ -25,7 +24,6 @@ export interface UserPreferences {
     promotions: boolean;
   };
   autoLocalization: boolean;
-  country?: string;
 }
 
 export interface MessageData {
@@ -41,6 +39,5 @@ export interface ConversationData {
 }
 
 export type preferences = null
-
 
 export type InputJsonValue = Prisma.InputJsonValue;

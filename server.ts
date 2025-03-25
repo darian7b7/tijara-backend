@@ -116,12 +116,8 @@ io.on("connection", (socket: Socket) => {
         const message = await prisma.message.create({
           data: {
             content: data.content,
-            sender: {
-              connect: { id: data.senderId }
-            },
-            recipient: {
-              connect: { id: data.recipientId }
-            }
+            senderId: data.senderId,
+            recipientId: data.recipientId,
           },
         });
 

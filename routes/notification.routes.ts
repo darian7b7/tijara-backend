@@ -11,8 +11,8 @@ const router = express.Router();
 // All notification routes should be protected
 router.use(protect);
 
-router.get("/", getNotifications as RequestHandler);
-router.put("/:id/read", markAsRead as RequestHandler);
-router.put("/read-all", markAllAsRead as RequestHandler);
+router.get("/", getNotifications as unknown as RequestHandler);
+router.put("/:id/read", markAsRead as unknown as RequestHandler);
+router.put("/read-all", markAllAsRead as unknown as RequestHandler);
 
 export default router;

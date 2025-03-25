@@ -10,28 +10,26 @@ generator client {
 
 // Main Models
 model User {
-  id            String         @id @default(cuid())
-  email         String        @unique
-  name          String?
-  username      String        @unique
-  password      String
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  username       String   @unique
+  password       String
   profilePicture String?
-  bio           String?
-  location      String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  role          UserRole      @default(USER)
-  preferences Json?
-  
+  bio            String?
+  location       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  role           UserRole @default(USER)
+  preferences    Json?
+
   // Relations
-  listings      Listing[]
-  listing       Listing?      @relation(fields: [listingId], references: [id])
-  listingId     String?
-  favorites     Favorite[]
-  sentMessages     Message[]        @relation("SentMessages")
-  receivedMessages Message[]        @relation("ReceivedMessages")
-  conversations    Conversation[]   @relation("UserConversations")
+  listings         Listing[]      @relation("UserListings")
+  sentMessages     Message[]      @relation("SentMessages")
+  receivedMessages Message[]      @relation("ReceivedMessages")
+  conversations    Conversation[] @relation("UserConversations")
   notifications    Notification[]
+  favorites        Favorite[]
 }
 
 enum UserRole {
@@ -40,25 +38,26 @@ enum UserRole {
 }
 
 model Listing {
-  id            String         @id @default(cuid())
+  id            String        @id @default(cuid())
   title         String
   description   String
   price         Float
   location      String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  status        ListingStatus  @default(ACTIVE)
-  listingAction ListingAction  @default(SELL)
-  condition     String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  status        ListingStatus @default(ACTIVE)
+  listingAction ListingAction @default(SELL)
+  condition     String
   category      String
-  
+
   // Relations
   userId        String
-  user          User           @relation(fields: [userId], references: [id])
+  user          User           @relation("UserListings", fields: [userId], references: [id])
   images        Image[]
   favorites     Favorite[]
   attributes    Attribute[]
   features      Feature[]
+  conversations Conversation[] @relation("ListingConversations")
 
   @@index([userId])
   @@index([category])
@@ -79,11 +78,11 @@ enum ListingAction {
 }
 
 model Image {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   url       String
-  order     Int      @default(0)
+  order     Int     @default(0)
   listingId String
-  listing   Listing  @relation(fields: [listingId], references: [id])
+  listing   Listing @relation(fields: [listingId], references: [id])
 
   @@index([listingId])
 }
@@ -104,50 +103,38 @@ model Favorite {
 // Messaging System
 model Conversation {
   id            String    @id @default(cuid())
-  participants  String[]
-  lastMessage   String?
-  lastMessageAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  // Relations
-  users         User[]    @relation("UserConversations")
+  participants  User[]    @relation("UserConversations")
+  listingId     String
+  listing       Listing   @relation("ListingConversations", fields: [listingId], references: [id])
   messages      Message[]
-
-  @@index([participants])
+  lastMessage   String?
+  lastMessageAt DateTime  @default(now())
 }
 
 model Message {
   id             String       @id @default(cuid())
   content        String
-  createdAt      DateTime     @default(now())
-  read           Boolean      @default(false)
-  
-  // Relations
   senderId       String
   sender         User         @relation("SentMessages", fields: [senderId], references: [id])
-  receiverId     String
-  receiver       User         @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  recipientId    String
+  recipient      User         @relation("ReceivedMessages", fields: [recipientId], references: [id])
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
-
-  @@index([senderId])
-  @@index([receiverId])
-  @@index([conversationId])
+  createdAt      DateTime     @default(now())
 }
 
 // Notification System
 model Notification {
-  id          String           @id @default(cuid())
-  type        NotificationType
-  content     String
-  read        Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  
+  id        String           @id @default(cuid())
+  type      NotificationType
+  content   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
   // Relations
-  userId      String
-  user        User             @relation(fields: [userId], references: [id])
-  relatedId   String?         // Could be listingId, messageId, etc.
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  relatedId String? // Could be listingId, messageId, etc.
 
   @@index([userId])
 }
@@ -162,21 +149,21 @@ enum NotificationType {
 
 // Flexible Attributes System
 model Attribute {
-  id          String   @id @default(cuid())
-  name        String
-  value       String
-  listingId   String
-  listing     Listing  @relation(fields: [listingId], references: [id])
+  id        String  @id @default(cuid())
+  name      String
+  value     String
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
 
   @@index([listingId])
 }
 
 model Feature {
-  id          String   @id @default(cuid())
-  name        String
-  value       Boolean  @default(false)
-  listingId   String
-  listing     Listing  @relation(fields: [listingId], references: [id])
+  id        String  @id @default(cuid())
+  name      String
+  value     Boolean @default(false)
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
 
   @@index([listingId])
 }
