@@ -10,17 +10,21 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     let conversation = await prisma.conversation.findFirst({
       where: {
         AND: [
-          { 
-            participants: {
-              some: {
-                id: { in: [senderId, receiverId] }
-              }
+          {
+            id: {
+              in: await prisma.conversation.findMany({
+                where: {
+                  AND: [
+                    { participants: { has: senderId } },
+                    { participants: { has: receiverId } }
+                  ]
+                },
+                select: { id: true }
+              }).then(convs => convs.map(c => c.id))
             }
           },
-          { 
-            listingId 
-          }
-        ],
+          { listingId }
+        ]
       },
     });
 
@@ -84,9 +88,14 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
   try {
     const conversations = await prisma.conversation.findMany({
       where: {
-        participants: {
-          has: req.user.id,
-        },
+        id: {
+          in: await prisma.conversation.findMany({
+            where: {
+              participants: { has: req.user.id }
+            },
+            select: { id: true }
+          }).then(convs => convs.map(c => c.id))
+        }
       },
       include: {
         messages: {
@@ -123,15 +132,16 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
-        OR: [{ senderId: req.user.id }, { receiverId: req.user.id }],
+        senderId: req.user.id
       },
       include: {
         sender: {
           select: {
+            id: true,
             username: true,
-            profilePicture: true,
-          },
-        },
+            profilePicture: true
+          }
+        }
       },
       orderBy: {
         createdAt: "desc",
@@ -144,11 +154,11 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
     await prisma.message.updateMany({
       where: {
         conversationId,
-        receiverId: req.user.id,
-        read: false,
+        recipientId: req.user.id,
+        read: false
       },
       data: {
-        read: true,
+        read: true
       },
     });
 

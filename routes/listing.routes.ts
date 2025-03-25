@@ -255,6 +255,7 @@ router.post(
         location = "",
         attributes = [],
         features = [],
+        condition, // Added condition field
       } = req.body;
 
       const images = authReq.processedImages || [];
@@ -266,7 +267,8 @@ router.post(
           price: parseFloat(price),
           category,
           location,
-          status: "ACTIVE" as ListingStatus,
+          status: ListingStatus.ACTIVE,
+          condition, // Added condition field
           userId,
           images: {
             create: images.map((image, index) => ({

@@ -110,15 +110,32 @@ io.on("connection", (socket: Socket) => {
     async (data: {
       senderId: string;
       recipientId: string;
+      conversationId: string;
       content: string;
     }) => {
       try {
         const message = await prisma.message.create({
           data: {
             content: data.content,
-            senderId: data.senderId,
-            recipientId: data.recipientId,
+            sender: {
+              connect: { id: data.senderId }
+            },
+            recipient: {
+              connect: { id: data.recipientId }
+            },
+            conversation: {
+              connect: { id: data.conversationId }
+            }
           },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                username: true,
+                profilePicture: true
+              }
+            }
+          }
         });
 
         // Send to recipient
