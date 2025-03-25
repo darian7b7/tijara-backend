@@ -3,8 +3,9 @@ const router = express.Router();
 const multer = require('multer');
 const { protect } = require('../middleware/auth');
 const { updateListing } = require('../controllers/listingController');
-const Listing = require('../models/listing.model.js');
+const { PrismaClient } = require("@prisma/client");
 
+const prisma = new PrismaClient();
 const upload = multer({
   storage: multer.diskStorage({
     destination: 'uploads/',

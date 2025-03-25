@@ -1,13 +1,7 @@
-import Listing from "../models/listing.model.js"; // Note the .js extension
+import prisma from "../lib/prismaClient";
 import { uploadToR2, deleteFromR2 } from "../config/cloudflareR2.js";
 import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 import { createNotification } from "./notification.controller.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const formatListingResponse = (listing) => {
   if (!listing) return null;
@@ -147,19 +141,19 @@ export const createListing = async (req, res) => {
     }
 
     // Create listing
-    const listing = new Listing({
-      title: req.body.title,
-      description: req.body.description,
-      price: parseFloat(req.body.price),
-      category: req.body.category,
-      location: req.body.location,
-      details: details,
-      images: imageUrls,
-      seller: req.user._id,
-      features: features
+    const listing = await prisma.listing.create({
+      data: {
+        title: req.body.title,
+        description: req.body.description,
+        price: parseFloat(req.body.price),
+        category: req.body.category,
+        location: req.body.location,
+        details: details,
+        images: imageUrls,
+        seller: req.user._id,
+        features: features
+      }
     });
-
-    await listing.save();
 
     // Create notification for the listing
     await createNotification(

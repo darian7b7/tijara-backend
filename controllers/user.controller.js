@@ -1,17 +1,31 @@
-import { PrismaClient } from "@prisma/client";
+import prisma from "../lib/prismaClient";
 import { uploadToR2, deleteFromR2 } from "../config/cloudflareR2.js";
 import bcrypt from "bcryptjs";
 import validator from "validator";
-import Listing from "../models/listing.model.js"; // Ensure .js is included
-
-const prisma = new PrismaClient();
 
 /**
  * ✅ Get the user's profile
  */
 export const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("-password").lean();
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        profilePicture: true,
+        bio: true,
+        location: true,
+        createdAt: true,
+        listings: {
+          include: {
+            images: true,
+            favorites: true
+          }
+        }
+      }
+    });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });

@@ -1,9 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "@prisma/client";
+import prisma from "../lib/prismaClient";
 import { validationResult } from "express-validator";
-
-const prisma = new PrismaClient();
 
 const signToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -21,7 +19,9 @@ export const register = async (req, res) => {
 
     const { username, email, password } = req.body;
 
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    const existingUser = await prisma.user.findFirst({
+      where: { $or: [{ email }, { username }] },
+    });
     if (existingUser) {
       return res.status(400).json({
         success: false,

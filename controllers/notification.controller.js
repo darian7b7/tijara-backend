@@ -1,4 +1,4 @@
-import Notification from "../models/notification.model.js";
+import prisma from "../lib/prismaClient";
 
 const validateNotificationType = (type) => {
   const validTypes = ["message", "like", "view", "save"];
@@ -18,14 +18,16 @@ export const createNotification = async (
       throw new Error("Invalid notification type");
     }
 
-    const notification = await Notification.create({
-      userId,
-      type,
-      listingId,
-      message,
-      title,
-      createdAt: new Date(),
-      read: false,
+    const notification = await prisma.notification.create({
+      data: {
+        userId,
+        type,
+        listingId,
+        message,
+        title,
+        createdAt: new Date(),
+        read: false,
+      },
     });
 
     // Emit the notification to the specific user

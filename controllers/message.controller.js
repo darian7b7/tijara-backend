@@ -1,70 +1,196 @@
-import Message from "../models/Message.js";
-import Conversation from "../models/conversation.model.js";
+import prisma from "../lib/prismaClient";
 
 export const sendMessage = async (req, res) => {
   try {
     const { receiverId, content, listingId } = req.body;
-    const senderId = req.user._id;
+    const senderId = req.user.id;
 
     // Find or create conversation
-    let conversation = await Conversation.findOne({
-      listing: listingId,
-      participants: { $all: [senderId, receiverId] },
+    let conversation = await prisma.conversation.findFirst({
+      where: {
+        AND: [
+          { listingId },
+          { participants: { hasEvery: [senderId, receiverId] } }
+        ]
+      }
     });
 
     if (!conversation) {
-      conversation = await Conversation.create({
-        listing: listingId,
-        participants: [senderId, receiverId],
+      conversation = await prisma.conversation.create({
+        data: {
+          listingId,
+          participants: [senderId, receiverId],
+          lastMessage: null,
+          lastMessageAt: new Date()
+        }
       });
     }
 
-    const message = await Message.create({
-      conversation: conversation._id,
-      sender: senderId,
-      receiver: receiverId,
-      content,
+    const message = await prisma.message.create({
+      data: {
+        content,
+        senderId,
+        receiverId,
+        conversationId: conversation.id,
+      },
+      include: {
+        sender: {
+          select: {
+            username: true,
+            profilePicture: true
+          }
+        }
+      }
     });
 
-    // Populate sender details
-    await message.populate("sender", "username profilePicture");
-
     // Update conversation's last message
-    conversation.lastMessage = message._id;
-    conversation.updatedAt = new Date();
-    await conversation.save();
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        lastMessage: content,
+        lastMessageAt: new Date()
+      }
+    });
 
-    res.status(201).json(message);
+    res.json({
+      success: true,
+      message,
+      conversation
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Message error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to send message"
+    });
   }
 };
 
 export const getConversations = async (req, res) => {
   try {
-    const conversations = await Conversation.find({
-      participants: req.user._id,
-    })
-      .populate("listing", "title images")
-      .populate("participants", "username profilePicture")
-      .populate("lastMessage")
-      .sort("-updatedAt");
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        participants: {
+          has: req.user.id
+        }
+      },
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 1
+        }
+      },
+      orderBy: {
+        lastMessageAt: 'desc'
+      }
+    });
 
-    res.json(conversations);
+    res.json({
+      success: true,
+      conversations
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Get conversations error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to get conversations"
+    });
   }
 };
 
 export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const messages = await Message.find({ conversation: conversationId })
-      .populate("sender", "username profilePicture")
-      .sort("createdAt");
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
 
-    res.json(messages);
+    const messages = await prisma.message.findMany({
+      where: { 
+        conversationId,
+        OR: [
+          { senderId: req.user.id },
+          { receiverId: req.user.id }
+        ]
+      },
+      include: {
+        sender: {
+          select: {
+            username: true,
+            profilePicture: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip,
+      take: Number(limit)
+    });
+
+    // Mark messages as read
+    await prisma.message.updateMany({
+      where: {
+        conversationId,
+        receiverId: req.user.id,
+        read: false
+      },
+      data: {
+        read: true
+      }
+    });
+
+    res.json({
+      success: true,
+      messages: messages.reverse(),
+      page: Number(page),
+      limit: Number(limit)
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Get messages error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to get messages"
+    });
+  }
+};
+
+export const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    
+    const message = await prisma.message.findUnique({
+      where: { id: messageId }
+    });
+
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        error: "Message not found"
+      });
+    }
+
+    if (message.senderId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: "Not authorized to delete this message"
+      });
+    }
+
+    await prisma.message.delete({
+      where: { id: messageId }
+    });
+
+    res.json({
+      success: true,
+      message: "Message deleted successfully"
+    });
+  } catch (error) {
+    console.error("Delete message error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete message"
+    });
   }
 };
