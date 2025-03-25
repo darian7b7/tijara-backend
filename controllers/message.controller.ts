@@ -1,4 +1,4 @@
-import prisma from "../lib/prismaClient";
+import prisma from "../lib/prismaClient.js";
 
 export const sendMessage = async (req, res) => {
   try {
@@ -10,9 +10,9 @@ export const sendMessage = async (req, res) => {
       where: {
         AND: [
           { listingId },
-          { participants: { hasEvery: [senderId, receiverId] } }
-        ]
-      }
+          { participants: { hasEvery: [senderId, receiverId] } },
+        ],
+      },
     });
 
     if (!conversation) {
@@ -21,8 +21,8 @@ export const sendMessage = async (req, res) => {
           listingId,
           participants: [senderId, receiverId],
           lastMessage: null,
-          lastMessageAt: new Date()
-        }
+          lastMessageAt: new Date(),
+        },
       });
     }
 
@@ -37,10 +37,10 @@ export const sendMessage = async (req, res) => {
         sender: {
           select: {
             username: true,
-            profilePicture: true
-          }
-        }
-      }
+            profilePicture: true,
+          },
+        },
+      },
     });
 
     // Update conversation's last message
@@ -48,20 +48,20 @@ export const sendMessage = async (req, res) => {
       where: { id: conversation.id },
       data: {
         lastMessage: content,
-        lastMessageAt: new Date()
-      }
+        lastMessageAt: new Date(),
+      },
     });
 
     res.json({
       success: true,
       message,
-      conversation
+      conversation,
     });
   } catch (error) {
     console.error("Message error:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to send message"
+      error: "Failed to send message",
     });
   }
 };
@@ -71,31 +71,31 @@ export const getConversations = async (req, res) => {
     const conversations = await prisma.conversation.findMany({
       where: {
         participants: {
-          has: req.user.id
-        }
+          has: req.user.id,
+        },
       },
       include: {
         messages: {
           orderBy: {
-            createdAt: 'desc'
+            createdAt: "desc",
           },
-          take: 1
-        }
+          take: 1,
+        },
       },
       orderBy: {
-        lastMessageAt: 'desc'
-      }
+        lastMessageAt: "desc",
+      },
     });
 
     res.json({
       success: true,
-      conversations
+      conversations,
     });
   } catch (error) {
     console.error("Get conversations error:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to get conversations"
+      error: "Failed to get conversations",
     });
   }
 };
@@ -107,26 +107,23 @@ export const getMessages = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const messages = await prisma.message.findMany({
-      where: { 
+      where: {
         conversationId,
-        OR: [
-          { senderId: req.user.id },
-          { receiverId: req.user.id }
-        ]
+        OR: [{ senderId: req.user.id }, { receiverId: req.user.id }],
       },
       include: {
         sender: {
           select: {
             username: true,
-            profilePicture: true
-          }
-        }
+            profilePicture: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: "desc",
       },
       skip,
-      take: Number(limit)
+      take: Number(limit),
     });
 
     // Mark messages as read
@@ -134,24 +131,24 @@ export const getMessages = async (req, res) => {
       where: {
         conversationId,
         receiverId: req.user.id,
-        read: false
+        read: false,
       },
       data: {
-        read: true
-      }
+        read: true,
+      },
     });
 
     res.json({
       success: true,
       messages: messages.reverse(),
       page: Number(page),
-      limit: Number(limit)
+      limit: Number(limit),
     });
   } catch (error) {
     console.error("Get messages error:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to get messages"
+      error: "Failed to get messages",
     });
   }
 };
@@ -159,38 +156,38 @@ export const getMessages = async (req, res) => {
 export const deleteMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
-    
+
     const message = await prisma.message.findUnique({
-      where: { id: messageId }
+      where: { id: messageId },
     });
 
     if (!message) {
       return res.status(404).json({
         success: false,
-        error: "Message not found"
+        error: "Message not found",
       });
     }
 
     if (message.senderId !== req.user.id) {
       return res.status(403).json({
         success: false,
-        error: "Not authorized to delete this message"
+        error: "Not authorized to delete this message",
       });
     }
 
     await prisma.message.delete({
-      where: { id: messageId }
+      where: { id: messageId },
     });
 
     res.json({
       success: true,
-      message: "Message deleted successfully"
+      message: "Message deleted successfully",
     });
   } catch (error) {
     console.error("Delete message error:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to delete message"
+      error: "Failed to delete message",
     });
   }
 };

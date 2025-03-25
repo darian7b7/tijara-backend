@@ -13,13 +13,13 @@ const s3 = new S3Client({
   region: "auto",
   endpoint: process.env.CLOUDFLARE_R2_ENDPOINT,
   credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY,
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY,
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY || "",
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY || "",
   },
 });
 
 // ✅ Upload File to Cloudflare R2
-export const uploadToR2 = async (file, category) => {
+export const uploadToR2 = async (file: Express.Multer.File, category: string) => {
   const folder = category === "avatar" ? "avatars/" : "listings/";
   const fileKey = `${folder}${crypto.randomUUID()}-${file.originalname.replace(/\s/g, "-")}`;
 
@@ -36,7 +36,7 @@ export const uploadToR2 = async (file, category) => {
 };
 
 // ✅ Delete File from Cloudflare R2
-export const deleteFromR2 = async (imageUrl) => {
+export const deleteFromR2 = async (imageUrl: string) => {
   const fileKey = imageUrl.replace(
     `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/`,
     "",

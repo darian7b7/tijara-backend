@@ -25,9 +25,10 @@ router.post("/upload", upload.single("image"), async (req, res) => {
     const imageUrl = await uploadToR2(req.file, category);
     res.json({ imageUrl });
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Image upload failed", details: error.message });
+    res.status(500).json({
+      error: "Image upload failed",
+      details: (error as Error).message,
+    });
   }
 });
 
@@ -50,7 +51,9 @@ router.delete("/delete", async (req, res) => {
 
     res.json({ success: true, message: "Image deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: "Server error", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Server error", details: (error as Error).message });
   }
 });
 

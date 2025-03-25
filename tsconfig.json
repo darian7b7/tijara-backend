@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Modern JS features
+    "module": "NodeNext", // Enable NodeNext modules
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2020"],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleDetection": "force", // Ensures only .ts files are treated as modules
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "outDir": "./dist", // Compiled files go here
+    "rootDir": ".", // Source .ts files
+    "baseUrl": ".", // Base URL
+    "allowJs": false,
+    "noEmitOnError": true,
+    "types": ["node", "express", "socket.io"]
+  },
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  },
+  "include": ["**/*.ts", "**/*.js"],
+  "exclude": ["node_modules", "dist"]
+}

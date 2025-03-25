@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { body } from "express-validator";
 import { protect } from "../middleware/auth.js";
 import {
@@ -10,7 +10,16 @@ import {
 
 const router = express.Router();
 
-// ✅ Register Route with Validation
+// Type-safe request handler wrapper
+const asyncHandler = (fn: Function) => (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// Register Route with Validation
 router.post(
   "/register",
   [
@@ -20,23 +29,23 @@ router.post(
       .isLength({ min: 6 })
       .withMessage("Password must be at least 6 characters"),
   ],
-  register,
+  asyncHandler(register)
 );
 
-// ✅ Login Route with Validation
+// Login Route with Validation
 router.post(
   "/login",
   [
     body("email").isEmail().withMessage("Please enter a valid email"),
     body("password").notEmpty().withMessage("Password is required"),
   ],
-  login,
+  asyncHandler(login)
 );
 
-// ✅ Logout Route (Clears HTTP-only cookie)
-router.post("/logout", logout);
+// Logout Route
+router.post("/logout", asyncHandler(logout));
 
-// ✅ Get Authenticated User Info (Protected)
-router.get("/me", protect, getMe);
+// Get Authenticated User Info (Protected)
+router.get("/me", protect, asyncHandler(getMe));
 
 export default router;
