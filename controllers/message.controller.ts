@@ -11,16 +11,17 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       where: {
         AND: [
           {
-            id: {
-              in: await prisma.conversation.findMany({
-                where: {
-                  AND: [
-                    { participants: { has: senderId } },
-                    { participants: { has: receiverId } }
-                  ]
-                },
-                select: { id: true }
-              }).then(convs => convs.map(c => c.id))
+            participants: {
+              some: {
+                id: senderId
+              }
+            }
+          },
+          {
+            participants: {
+              some: {
+                id: receiverId
+              }
             }
           },
           { listingId }
@@ -54,10 +55,11 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       include: {
         sender: {
           select: {
+            id: true,
             username: true,
-            profilePicture: true,
-          },
-        },
+            profilePicture: true
+          }
+        }
       },
     });
 
@@ -88,13 +90,10 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
   try {
     const conversations = await prisma.conversation.findMany({
       where: {
-        id: {
-          in: await prisma.conversation.findMany({
-            where: {
-              participants: { has: req.user.id }
-            },
-            select: { id: true }
-          }).then(convs => convs.map(c => c.id))
+        participants: {
+          some: {
+            id: req.user.id
+          }
         }
       },
       include: {
@@ -132,7 +131,10 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
-        senderId: req.user.id
+        OR: [
+          { senderId: req.user.id },
+          { recipientId: req.user.id }
+        ]
       },
       include: {
         sender: {

@@ -279,16 +279,13 @@ export const updateUserSettings = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Convert preferences to Prisma.JsonObject
-    const preferencesJson = preferences as Prisma.JsonObject;
+    // Convert preferences to Prisma.JsonValue
+    const preferencesJson = JSON.parse(JSON.stringify(preferences)) as unknown as Prisma.JsonValue;
 
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data: {
         preferences: preferencesJson
-      },
-      select: {
-        preferences: true
       }
     });
 
