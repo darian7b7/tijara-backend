@@ -10,6 +10,8 @@ import prisma from "./lib/prismaClient.js";
 import dotenv from "dotenv";
 import morgan from "morgan";
 import errorHandler from "./middleware/errorHandler.js";
+import { getDirname } from "./utils/path.utils.js";
+const __dirname = getDirname(import.meta.url);
 
 // Load environment variables
 dotenv.config();
@@ -52,7 +54,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Static: Uploads folder
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static(new URL("uploads", import.meta.url).pathname));
 
 // Health Check
 app.get("/api/health", (req: Request, res: Response) => {

@@ -4,6 +4,8 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { Request, Response, NextFunction } from "express";
+import { getDirname } from "../utils/path.utils.js";
+import { join } from "path";
 
 // Extend Express Request
 declare global {
@@ -38,6 +40,9 @@ interface R2ClientConfig {
 
 dotenv.config();
 
+const __dirname = getDirname(import.meta.url);
+const uploadsDir = join(__dirname, "..", "uploads");
+
 // Initialize Cloudflare R2 Client
 const r2Config: R2ClientConfig = {
   region: "auto",
@@ -62,7 +67,7 @@ const allowedMimeTypes = new Set([
   "image/webp",
 ]);
 
-const maxFileSize = 5 * 1024 * 1024; // 5MB
+const maxFileSize = 10 * 1024 * 1024; // 10MB
 
 // File filter function
 const fileFilter = (
@@ -77,7 +82,7 @@ const fileFilter = (
 
   // Additional security checks
   if (file.size > maxFileSize) {
-    cb(new Error("File size too large. Maximum size is 5MB."));
+    cb(new Error("File size too large. Maximum size is 10MB."));
     return;
   }
 
