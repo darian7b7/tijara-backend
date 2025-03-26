@@ -1,62 +1,65 @@
-import express from "express";
-import type { Request, Response, NextFunction } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import { createServer } from "node:http";
-import { Server } from "socket.io";
-import type { Socket } from "socket.io";
+import { Server, Socket } from "socket.io";
 import prisma from "./lib/prismaClient.js";
 import dotenv from "dotenv";
 import morgan from "morgan";
+import errorHandler from "./middleware/errorHandler.js";
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        role: string;
-      };
-    }
-  }
-}
-
+// Load environment variables
 dotenv.config();
 
+// Initialize app and HTTP server
 const app = express();
 const httpServer = createServer(app);
 
-// Security middleware
+// Middleware: Security
 app.use(helmet());
 app.use(compression());
 
-// CORS configuration
+// Middleware: Logging
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+}
+
+// Middleware: CORS
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  }),
+  })
 );
 
-// Body parser middleware
+// Middleware: Body parsers
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
-// Global rate limiter
+// Middleware: Rate Limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use(limiter);
 
-// Import routes
+// Static: Uploads folder
+app.use("/uploads", express.static("uploads"));
+
+// Health Check
+app.get("/api/health", (req: Request, res: Response) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Import Routes
 import authRoutes from "./routes/auth.routes.js";
 import listingRoutes from "./routes/listing.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -64,7 +67,7 @@ import messageRoutes from "./routes/message.routes.js";
 import uploadRoutes from "./routes/uploads.js";
 import notificationRoutes from "./routes/notification.routes.js";
 
-// Routes
+// Register Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/listings", listingRoutes);
 app.use("/api/users", userRoutes);
@@ -72,15 +75,7 @@ app.use("/api/messaging", messageRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-// Serve images locally if not using Cloudflare
-app.use("/uploads", express.static("uploads"));
-
-// Health check endpoint
-app.get("/api/health", (req: Request, res: Response) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// Socket.io setup
+// Socket.io Setup
 const io = new Server(httpServer, {
   serveClient: false,
   pingTimeout: 30000,
@@ -93,7 +88,6 @@ const io = new Server(httpServer, {
   },
 });
 
-// Make io available in routes
 app.set("io", io);
 
 // Socket.io connection handling
@@ -105,81 +99,60 @@ io.on("connection", (socket: Socket) => {
     console.log(`User ${userId} joined their room`);
   });
 
-  socket.on(
-    "sendMessage",
-    async (data: {
-      senderId: string;
-      recipientId: string;
-      conversationId: string;
-      content: string;
-    }) => {
-      try {
-        const message = await prisma.message.create({
-          data: {
-            content: data.content,
-            sender: {
-              connect: { id: data.senderId }
+  socket.on("sendMessage", async (data) => {
+    try {
+      const message = await prisma.message.create({
+        data: {
+          content: data.content,
+          sender: { connect: { id: data.senderId } },
+          recipient: { connect: { id: data.recipientId } },
+          conversation: { connect: { id: data.conversationId } },
+        },
+        include: {
+          sender: {
+            select: {
+              id: true,
+              username: true,
+              profilePicture: true,
             },
-            recipient: {
-              connect: { id: data.recipientId }
-            },
-            conversation: {
-              connect: { id: data.conversationId }
-            }
           },
-          include: {
-            sender: {
-              select: {
-                id: true,
-                username: true,
-                profilePicture: true
-              }
-            }
-          }
-        });
+        },
+      });
 
-        // Send to recipient
-        io.to(data.recipientId).emit("newMessage", message);
-        // Send back to sender
-        socket.emit("messageSent", message);
-      } catch (error) {
-        console.error("Error saving message:", error);
-        socket.emit("messageError", { error: "Failed to send message" });
-      }
-    },
-  );
+      io.to(data.recipientId).emit("newMessage", message);
+      socket.emit("messageSent", message);
+    } catch (error) {
+      console.error("Error saving message:", error);
+      socket.emit("messageError", { error: "Failed to send message" });
+    }
+  });
 
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
   });
 });
 
-// Error handling middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({
-    message:
-      process.env.NODE_ENV === "production"
-        ? "Internal server error"
-        : err.message,
-  });
-});
+// Error Handler Middleware (last middleware)
+app.use(errorHandler);
 
-// Global Error Handler
-app.use(require("./middleware/errorHandler.js"));
-
+// Start server
 const PORT = process.env.PORT || 5001;
 async function startServer() {
   try {
-    // Test database connection
     await prisma.$connect();
-    console.log("Connected to database successfully");
+    console.log("✅ Connected to database");
 
     httpServer.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+
+    process.on("SIGINT", async () => {
+      await prisma.$disconnect();
+      console.log("🛑 Gracefully shutting down");
+      process.exit(0);
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error("❌ Failed to start server:", error);
   }
 }
 

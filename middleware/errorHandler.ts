@@ -4,13 +4,14 @@ interface CustomError extends Error {
   status?: number;
 }
 
+// Typed error handler
 const errorHandler: ErrorRequestHandler = (
   err: CustomError,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  console.error(err.stack);
+  console.error("💥 Error Handler:", err.stack);
 
   res.status(err.status || 500).json({
     message: err.message || "Internal Server Error",
@@ -19,3 +20,4 @@ const errorHandler: ErrorRequestHandler = (
 };
 
 export default errorHandler;
+
