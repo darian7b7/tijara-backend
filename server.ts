@@ -30,9 +30,33 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Middleware: CORS
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:3000",
+  "https://tijara-frontend.vercel.app",
+  "https://tijara-frontend-git-main.vercel.app",
+  "https://tijara-frontend-*.vercel.app"
+];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: function(origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Check if the origin is in our allowed list
+      if (allowedOrigins.some(allowedOrigin => {
+        // Handle wildcard domains
+        if (allowedOrigin.includes('*')) {
+          const pattern = new RegExp('^' + allowedOrigin.replace('*', '.*') + '$');
+          return pattern.test(origin);
+        }
+        return allowedOrigin === origin;
+      })) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
