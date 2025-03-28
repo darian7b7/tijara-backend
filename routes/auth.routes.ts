@@ -8,6 +8,7 @@ import {
   logout,
 } from "../controllers/auth.controller.js";
 import { validateRegistration, validate } from "../middleware/validation.middleware.js";
+import { loginLimiter } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -43,14 +44,15 @@ router.post(
   asyncHandler(register)
 );
 
-// Login Route with Validation
+// Login Route with Validation and Rate Limiting
 router.post(
   "/login",
+  loginLimiter,
   [
     body("email").isEmail().withMessage("Please enter a valid email"),
     body("password").notEmpty().withMessage("Password is required"),
   ],
-  asyncHandler(login),
+  asyncHandler(login)
 );
 
 // Logout Route

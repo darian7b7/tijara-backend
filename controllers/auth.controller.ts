@@ -131,9 +131,19 @@ export const register = async (req: Request, res: Response) => {
 // Login User
 export const login = async (req: Request, res: Response) => {
   try {
-    console.log("👤 Login attempt for:", req.body.email);
+    console.log("Login attempt for:", req.body.email);
     
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Email and password are required"
+        }
+      });
+    }
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -150,7 +160,7 @@ export const login = async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      console.log("❌ Login failed: User not found -", email);
+      console.log("Login failed: User not found -", email);
       return res.status(401).json({
         success: false,
         error: {
@@ -162,8 +172,13 @@ export const login = async (req: Request, res: Response) => {
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
+    console.log("Password verification:", {
+      isValid: isValidPassword,
+      userEmail: email
+    });
+
     if (!isValidPassword) {
-      console.log("❌ Login failed: Invalid password -", email);
+      console.log("Login failed: Invalid password -", email);
       return res.status(401).json({
         success: false,
         error: {
@@ -181,7 +196,7 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: "30d" }
     );
 
-    console.log("✅ Login successful:", {
+    console.log("Login successful:", {
       userId: user.id,
       email: user.email,
       tokensGenerated: true
@@ -205,7 +220,7 @@ export const login = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("❌ Login Error:", error);
+    console.error("Login Error:", error);
     return res.status(500).json({
       success: false,
       error: {
