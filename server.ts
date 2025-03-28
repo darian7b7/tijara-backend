@@ -34,7 +34,8 @@ const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:3000",
   "https://tijara-frontend.vercel.app",
   "https://tijara-frontend-git-main.vercel.app",
-  "https://tijara-frontend-*.vercel.app"
+  "https://tijara-frontend-*.vercel.app",
+  "http://localhost:5173" // Vite dev server
 ];
 
 app.use(
@@ -62,6 +63,9 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
+
+// Enable pre-flight requests for all routes
+app.options('*', cors());
 
 // Middleware: Body parsers
 app.use(express.json({ limit: "10mb" }));
