@@ -81,7 +81,7 @@ app.use(limiter);
 app.use("/uploads", express.static(new URL("uploads", import.meta.url).pathname));
 
 // Health Check
-app.get("/api/health", (req: Request, res: Response) => {
+app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
@@ -94,12 +94,12 @@ import uploadRoutes from "./routes/uploads.js";
 import notificationRoutes from "./routes/notification.routes.js";
 
 // Register Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/listings", listingRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/messaging", messageRoutes);
-app.use("/api/uploads", uploadRoutes);
-app.use("/api/notifications", notificationRoutes);
+app.use("/auth", authRoutes);
+app.use("/listings", listingRoutes);
+app.use("/users", userRoutes);
+app.use("/messaging", messageRoutes);
+app.use("/uploads", uploadRoutes);
+app.use("/notifications", notificationRoutes);
 
 // Socket.io Setup
 const io = new Server(httpServer, {
