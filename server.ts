@@ -94,12 +94,12 @@ import uploadRoutes from "./routes/uploads.js";
 import notificationRoutes from "./routes/notification.routes.js";
 
 // Register Routes
-app.use("/auth", authRoutes);
-app.use("/listings", listingRoutes);
-app.use("/users", userRoutes);
-app.use("/messaging", messageRoutes);
-app.use("/uploads", uploadRoutes);
-app.use("/notifications", notificationRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/listings", listingRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/messaging", messageRoutes);
+app.use("/api/uploads", uploadRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Socket.io Setup
 const io = new Server(httpServer, {
