@@ -55,6 +55,12 @@ export const protect = async (
   next: NextFunction,
 ) => {
   try {
+    console.log("🔒 Auth Middleware Headers:", {
+      auth: req.headers.authorization,
+      method: req.method,
+      path: req.path
+    });
+
     let token: string | undefined;
 
     if (
@@ -65,32 +71,65 @@ export const protect = async (
     }
 
     if (!token) {
-      return res.status(401).json({ message: "Not authorized, no token" });
+      console.log("❌ No token provided");
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "NO_TOKEN",
+          message: "Not authorized, no token"
+        }
+      });
     }
 
-    // Verify token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string,
-    ) as JwtPayload;
+    try {
+      // Verify token
+      const decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET as string,
+      ) as JwtPayload;
 
-    // Get user from token
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: {
-        id: true,
-        role: true,
-      },
-    });
+      // Get user from token
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: {
+          id: true,
+          role: true,
+        },
+      });
 
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
+      if (!user) {
+        console.log("❌ User not found for token");
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: "USER_NOT_FOUND",
+            message: "User not found"
+          }
+        });
+      }
+
+      console.log("✅ Token verified for user:", user.id);
+      req.user = user;
+      next();
+    } catch (error) {
+      console.error("❌ Token verification failed:", error);
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "INVALID_TOKEN",
+          message: "Not authorized, invalid token"
+        }
+      });
     }
-
-    req.user = user;
-    next();
   } catch (error) {
-    res.status(401).json({ message: "Not authorized, invalid token" });
+    console.error("❌ Auth middleware error:", error);
+    res.status(401).json({
+      success: false,
+      error: {
+        code: "AUTH_ERROR",
+        message: "Authentication failed"
+      }
+    });
   }
 };
 
