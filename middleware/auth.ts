@@ -18,9 +18,9 @@ declare global {
 
 // Rate limiters
 export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per windowMs
-  message: { message: "Too many login attempts, please try again later." },
+  windowMs: 2 * 60 * 1000, // 2 minutes
+  max: 3, // Limit each IP to 3 requests per windowMs
+  message: { message: "Too many login attempts, please try again after 2 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -50,6 +50,18 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error("JWT_SECRET is not configured!");
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: "SERVER_CONFIG_ERROR",
+          message: "Server configuration error"
+        }
+      });
+    }
+
     // Get token from header
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith("Bearer ")
@@ -61,15 +73,27 @@ export const authenticate = async (
         success: false,
         error: {
           code: "NO_TOKEN",
-          message: "No token provided"
+          message: "Authentication required. Please log in."
         }
       });
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "") as {
+    const decoded = jwt.verify(token, jwtSecret) as {
       id: string;
+      exp?: number;
     };
+
+    // Check token expiration
+    if (decoded.exp && Date.now() >= decoded.exp * 1000) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "TOKEN_EXPIRED",
+          message: "Your session has expired. Please log in again."
+        }
+      });
+    }
 
     // Get user from token
     const user = await prisma.user.findUnique({
@@ -87,7 +111,7 @@ export const authenticate = async (
         success: false,
         error: {
           code: "INVALID_TOKEN",
-          message: "Invalid token"
+          message: "Invalid authentication token."
         }
       });
     }
@@ -97,11 +121,32 @@ export const authenticate = async (
     next();
   } catch (error) {
     console.error("Authentication Error:", error);
+    
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "TOKEN_EXPIRED",
+          message: "Your session has expired. Please log in again."
+        }
+      });
+    }
+    
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "INVALID_TOKEN",
+          message: "Invalid authentication token."
+        }
+      });
+    }
+
     return res.status(401).json({
       success: false,
       error: {
         code: "AUTH_ERROR",
-        message: "Not authorized"
+        message: "Authentication failed. Please log in again."
       }
     });
   }

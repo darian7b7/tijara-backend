@@ -1,31 +1,32 @@
 import { Request, Response } from "express";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prismaClient.js";
 import { validationResult } from "express-validator";
-import rateLimit from "express-rate-limit";
 
 interface AuthTokens {
   accessToken: string;
   refreshToken: string;
 }
 
-// Rate limiting for login attempts
-export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 login attempts per window
-  message: "Too many login attempts, please try again after 15 minutes",
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-});
-
-const signToken = (userId: string): string => {
-  if (!process.env.JWT_SECRET) {
-    throw new Error("JWT_SECRET is not defined");
+const generateTokens = (userId: string): AuthTokens => {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error("JWT_SECRET is not configured");
   }
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
-  });
+
+  const accessTokenOptions: SignOptions = {
+    expiresIn: Number(process.env.JWT_EXPIRY?.replace(/[^0-9]/g, '')) || 7 * 24 * 60 * 60,
+  };
+
+  const refreshTokenOptions: SignOptions = {
+    expiresIn: Number(process.env.REFRESH_TOKEN_EXPIRY?.replace(/[^0-9]/g, '')) || 30 * 24 * 60 * 60,
+  };
+
+  const accessToken = jwt.sign({ id: userId }, jwtSecret, accessTokenOptions);
+  const refreshToken = jwt.sign({ id: userId }, jwtSecret, refreshTokenOptions);
+
+  return { accessToken, refreshToken };
 };
 
 // Register a New User
@@ -71,8 +72,8 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(12);
+    // Hash password with configured salt rounds
+    const salt = await bcrypt.genSalt(Number(process.env.BCRYPT_SALT_ROUNDS) || 12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create user
@@ -87,12 +88,7 @@ export const register = async (req: Request, res: Response) => {
     });
 
     // Generate tokens
-    const accessToken = signToken(user.id);
-    const refreshToken = jwt.sign(
-      { id: user.id },
-      process.env.JWT_SECRET || "",
-      { expiresIn: "30d" }
-    );
+    const tokens = generateTokens(user.id);
 
     console.log("User registered successfully:", {
       id: user.id,
@@ -109,10 +105,7 @@ export const register = async (req: Request, res: Response) => {
           name: user.name,
           role: user.role,
         },
-        tokens: {
-          accessToken,
-          refreshToken,
-        },
+        tokens,
       },
     });
   } catch (error) {
@@ -188,12 +181,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // Generate tokens
-    const accessToken = signToken(user.id);
-    const refreshToken = jwt.sign(
-      { id: user.id },
-      process.env.JWT_SECRET || "",
-      { expiresIn: "30d" }
-    );
+    const tokens = generateTokens(user.id);
 
     console.log("Login successful:", {
       userId: user.id,
@@ -212,10 +200,7 @@ export const login = async (req: Request, res: Response) => {
           profilePicture: user.profilePicture,
           role: user.role,
         },
-        tokens: {
-          accessToken,
-          refreshToken,
-        },
+        tokens,
       },
     });
   } catch (error) {
@@ -239,22 +224,32 @@ export const refreshToken = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         error: {
-          code: "MISSING_TOKEN",
+          code: "VALIDATION_ERROR",
           message: "Refresh token is required"
         }
       });
     }
 
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error("JWT_SECRET is not configured");
+    }
+
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET || "") as { id: string };
-    
-    // Check if user exists
+    const decoded = jwt.verify(refreshToken, jwtSecret) as { id: string };
+
+    // Generate new tokens
+    const tokens = generateTokens(decoded.id);
+
+    // Get user info
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: {
         id: true,
         email: true,
         username: true,
+        name: true,
+        profilePicture: true,
         role: true,
       },
     });
@@ -269,51 +264,67 @@ export const refreshToken = async (req: Request, res: Response) => {
       });
     }
 
-    // Generate new tokens
-    const accessToken = signToken(decoded.id);
-    const newRefreshToken = jwt.sign(
-      { id: decoded.id },
-      process.env.JWT_SECRET || "",
-      { expiresIn: "30d" }
-    );
-
     return res.json({
       success: true,
       data: {
-        tokens: {
-          accessToken,
-          refreshToken: newRefreshToken,
-        },
+        user,
+        tokens,
       },
     });
   } catch (error) {
     console.error("Token Refresh Error:", error);
-    return res.status(401).json({
+
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "TOKEN_EXPIRED",
+          message: "Refresh token has expired"
+        }
+      });
+    }
+
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "INVALID_TOKEN",
+          message: "Invalid refresh token"
+        }
+      });
+    }
+
+    return res.status(500).json({
       success: false,
       error: {
-        code: "INVALID_TOKEN",
-        message: "Invalid or expired refresh token"
+        code: "SERVER_ERROR",
+        message: "An error occurred while refreshing token"
       }
     });
   }
 };
 
 // Logout User
-export const logout = (req: Request, res: Response) => {
-  if (!req.user) {
-    return res.status(401).json({
+export const logout = async (req: Request, res: Response) => {
+  try {
+    // Since we're using JWT, we don't need to do anything server-side
+    // The client should remove the tokens
+    return res.json({
+      success: true,
+      data: {
+        message: "Successfully logged out"
+      }
+    });
+  } catch (error) {
+    console.error("Logout Error:", error);
+    return res.status(500).json({
       success: false,
       error: {
-        code: "NOT_AUTHENTICATED",
-        message: "Not authenticated"
+        code: "SERVER_ERROR",
+        message: "An error occurred during logout"
       }
     });
   }
-
-  return res.json({
-    success: true,
-    message: "Logged out successfully",
-  });
 };
 
 // Get Authenticated User Info
@@ -323,7 +334,7 @@ export const getMe = async (req: Request, res: Response) => {
       return res.status(401).json({
         success: false,
         error: {
-          code: "NOT_AUTHENTICATED",
+          code: "AUTH_ERROR",
           message: "Not authenticated"
         }
       });
@@ -333,11 +344,13 @@ export const getMe = async (req: Request, res: Response) => {
       where: { id: req.user.id },
       select: {
         id: true,
-        username: true,
         email: true,
+        username: true,
         name: true,
         profilePicture: true,
         role: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
@@ -345,7 +358,7 @@ export const getMe = async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: {
-          code: "USER_NOT_FOUND",
+          code: "NOT_FOUND",
           message: "User not found"
         }
       });
