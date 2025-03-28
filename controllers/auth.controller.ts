@@ -248,6 +248,27 @@ export const refreshToken = async (req: Request, res: Response) => {
     // Verify refresh token
     const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET || "") as { id: string };
     
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "INVALID_TOKEN",
+          message: "Invalid refresh token"
+        }
+      });
+    }
+
     // Generate new tokens
     const accessToken = signToken(decoded.id);
     const newRefreshToken = jwt.sign(
