@@ -30,15 +30,14 @@ const signToken = (userId: string): string => {
 // Register a New User
 export const register = async (req: Request, res: Response) => {
   try {
-    console.log("Registration request received:", {
-      body: req.body,
-      headers: req.headers,
+    console.log("📝 Registration request:", {
+      email: req.body.email,
+      username: req.body.username,
     });
 
-    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log("Validation Errors:", errors.array());
+      console.log("❌ Validation errors:", errors.array());
       return res.status(400).json({
         success: false,
         message: "Validation failed",
@@ -47,7 +46,6 @@ export const register = async (req: Request, res: Response) => {
     }
 
     const { username, email, password } = req.body;
-    console.log("Processing registration for:", { username, email });
 
     // Check for existing user
     const existingUser = await prisma.user.findFirst({
@@ -58,90 +56,57 @@ export const register = async (req: Request, res: Response) => {
 
     if (existingUser) {
       const field = existingUser.email === email ? "email" : "username";
-      console.log(`Registration failed: ${field} already exists`);
+      console.log(`❌ Registration failed: ${field} already exists`);
       return res.status(400).json({
         success: false,
         message: `This ${field} is already registered.`,
-        errors: [
-          {
-            type: "field",
-            value: field === "email" ? email : username,
-            msg: `This ${field} is already registered.`,
-            path: field,
-            location: "body",
-          },
-        ],
       });
     }
 
     // Create new user
-    try {
-      const salt = await bcrypt.genSalt(12);
-      const hashedPassword = await bcrypt.hash(password, salt);
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-      console.log("Creating new user with username:", username);
-      const user = await prisma.user.create({
-        data: {
-          username,
-          email,
-          password: hashedPassword,
-          role: "USER",
+    const user = await prisma.user.create({
+      data: {
+        username,
+        email,
+        password: hashedPassword,
+        role: "USER",
+      },
+    });
+
+    console.log("✅ User created:", { id: user.id, email: user.email });
+
+    // Generate tokens
+    const accessToken = signToken(user.id);
+    const refreshToken = jwt.sign(
+      { id: user.id },
+      process.env.JWT_SECRET || "",
+      { expiresIn: "30d" }
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          profilePicture: user.profilePicture,
         },
-      });
-
-      // Generate tokens
-      const accessToken = signToken(user.id);
-      const refreshToken = jwt.sign(
-        { id: user.id },
-        process.env.JWT_SECRET || "",
-        { expiresIn: "30d" },
-      );
-
-      console.log("Registration successful for:", email);
-      return res.status(201).json({
-        success: true,
-        data: {
-          user: {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            role: user.role,
-            profilePicture: user.profilePicture,
-          },
-          tokens: {
-            accessToken,
-            refreshToken,
-          },
+        tokens: {
+          accessToken,
+          refreshToken,
         },
-      });
-    } catch (error: any) {
-      console.error("Database error during user creation:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Error creating user account",
-        errors: [
-          {
-            type: "server",
-            msg: error.message || "Internal server error",
-            path: "database",
-            location: "server",
-          },
-        ],
-      });
-    }
-  } catch (error: any) {
-    console.error("Registration error:", error);
+      },
+    });
+  } catch (error) {
+    console.error("❌ Registration error:", error);
     return res.status(500).json({
       success: false,
       message: "Registration failed",
-      errors: [
-        {
-          type: "server",
-          msg: error.message || "Internal server error",
-          path: "server",
-          location: "server",
-        },
-      ],
     });
   }
 };

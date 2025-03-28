@@ -41,6 +41,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
+    console.log("🌐 CORS Request from:", origin);
     if (!origin) return callback(null, true);
     
     const isAllowed = allowedOrigins.some(allowedOrigin => {
@@ -63,7 +64,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 // Enable pre-flight requests for all routes
@@ -120,13 +121,13 @@ import messageRoutes from "./routes/message.routes.js";
 import uploadRoutes from "./routes/uploads.js";
 import notificationRoutes from "./routes/notification.routes.js";
 
-// Register Routes
-app.use("/auth", authRoutes);
-app.use("/listings", listingRoutes);
-app.use("/users", userRoutes);
-app.use("/messaging", messageRoutes);
-app.use("/uploads", uploadRoutes);
-app.use("/notifications", notificationRoutes);
+// Register Routes with /api prefix
+app.use("/api/auth", authRoutes);
+app.use("/api/listings", listingRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/messaging", messageRoutes);
+app.use("/api/uploads", uploadRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Socket.io Setup
 const io = new Server(httpServer, {
