@@ -74,10 +74,9 @@ app.use(cookieParser());
 
 // Middleware: Rate Limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 1000, // Allow more requests
+  message: "Too many requests, please try again later.",
 });
 app.use(limiter);
 
