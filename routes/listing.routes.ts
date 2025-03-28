@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { protect } from "../middleware/auth.js";
+import { authenticate, listingLimiter } from "../middleware/auth.js";
 import prisma from "../lib/prismaClient.js";
 import {
   upload,
@@ -191,7 +191,7 @@ router.get("/trending", async (_req: Request, res: Response) => {
 });
 
 // Protected Routes
-router.use(protect);
+router.use(authenticate);
 
 router.get("/saved", async (req: Request, res: Response) => {
   try {
