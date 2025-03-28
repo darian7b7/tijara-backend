@@ -131,19 +131,21 @@ export const register = async (req: Request, res: Response) => {
 // Login User
 export const login = async (req: Request, res: Response) => {
   try {
-    // Validate request
+    console.log("Login attempt for:", req.body.email);
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log("Login Validation Errors:", errors.array());
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
-        errors: errors.array(),
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid email or password format",
+          details: errors.array()
+        }
       });
     }
 
     const { email, password } = req.body;
-    console.log("Processing login for:", email);
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -153,6 +155,7 @@ export const login = async (req: Request, res: Response) => {
         email: true,
         password: true,
         username: true,
+        name: true,
         profilePicture: true,
         role: true,
       },
@@ -162,7 +165,10 @@ export const login = async (req: Request, res: Response) => {
       console.log("Login failed: User not found -", email);
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        error: {
+          code: "INVALID_CREDENTIALS",
+          message: "Invalid email or password"
+        }
       });
     }
 
@@ -172,18 +178,26 @@ export const login = async (req: Request, res: Response) => {
       console.log("Login failed: Invalid password -", email);
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        error: {
+          code: "INVALID_CREDENTIALS",
+          message: "Invalid email or password"
+        }
       });
     }
 
-    // Generate token
+    // Generate tokens
     const accessToken = signToken(user.id);
     const refreshToken = jwt.sign(
       { id: user.id },
       process.env.JWT_SECRET || "",
-      { expiresIn: "30d" },
+      { expiresIn: "30d" }
     );
-    console.log("Login successful for:", email);
+
+    console.log("Login successful:", {
+      userId: user.id,
+      email: user.email,
+      tokensGenerated: true
+    });
 
     return res.json({
       success: true,
@@ -192,6 +206,7 @@ export const login = async (req: Request, res: Response) => {
           id: user.id,
           username: user.username,
           email: user.email,
+          name: user.name,
           profilePicture: user.profilePicture,
           role: user.role,
         },
@@ -205,7 +220,10 @@ export const login = async (req: Request, res: Response) => {
     console.error("Login Error:", error);
     return res.status(500).json({
       success: false,
-      message: "An error occurred during login.",
+      error: {
+        code: "SERVER_ERROR",
+        message: "An error occurred during login"
+      }
     });
   }
 };
