@@ -31,7 +31,7 @@ if (process.env.NODE_ENV === "development") {
 
 // Middleware: CORS
 app.use(cors({
-  origin: function (origin, callback) {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     console.log("🌐 CORS Request from:", origin);
     
     const allowedOrigins = [
@@ -49,54 +49,29 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
 
-// Enable pre-flight requests for all routes
-app.options("*", cors());
-
-// Middleware: Body parsers
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// Cookie parser middleware
+// Middleware: Body Parser
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
-// Configure secure cookie settings
-app.use((req, res, next) => {
-  res.cookie = res.cookie.bind(res);
-  const originalSetCookie = res.setHeader.bind(res, "Set-Cookie");
-  res.setHeader = function (name: string, value: any) {
-    if (name.toLowerCase() === "set-cookie") {
-      if (Array.isArray(value)) {
-        value = value.map((v) => v + "; SameSite=None; Secure");
-      } else if (typeof value === "string") {
-        value = value + "; SameSite=None; Secure";
-      }
-    }
-    return originalSetCookie(value);
-  };
-  next();
-});
 
 // Middleware: Rate Limiting
 const limiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 1000, // Allow more requests
-  message: "Too many requests, please try again later.",
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again after 15 minutes"
 });
+
 app.use(limiter);
-
-// Static: Uploads folder
-app.use(
-  "/uploads",
-  express.static(new URL("uploads", import.meta.url).pathname),
-);
-
-// Health Check
-app.get("/health", (req: Request, res: Response) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
-});
 
 // Add before your routes
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -108,7 +83,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   
   // Log response
   const originalSend = res.send;
-  res.send = function (body) {
+  res.send = function (body: any) {
     console.log(`📤 Response ${res.statusCode}`, {
       body: body,
     });
@@ -126,30 +101,13 @@ import messageRoutes from "./routes/message.routes.js";
 import uploadRoutes from "./routes/uploads.js";
 import notificationRoutes from "./routes/notification.routes.js";
 
-// Create API router
-const apiRouter = express.Router();
-
-// Add debug logging for API routes
-apiRouter.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`📥 API Request:`, {
-    method: req.method,
-    path: req.path,
-    body: req.body,
-    query: req.query,
-  });
-  next();
-});
-
-// Mount routes on API router
-apiRouter.use("/auth", authRoutes);
-apiRouter.use("/listings", listingRoutes);
-apiRouter.use("/users", userRoutes);
-apiRouter.use("/messages", messageRoutes);
-apiRouter.use("/uploads", uploadRoutes);
-apiRouter.use("/notifications", notificationRoutes);
-
-// Mount API router at /api
-app.use("/api", apiRouter);
+// Mount routes directly (no /api prefix)
+app.use("/auth", authRoutes);
+app.use("/listings", listingRoutes);
+app.use("/users", userRoutes);
+app.use("/messages", messageRoutes);
+app.use("/uploads", uploadRoutes);
+app.use("/notifications", notificationRoutes);
 
 // Add debug middleware to log all requests
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -200,32 +158,9 @@ io.on("connection", (socket: Socket) => {
     console.log(`User ${userId} joined their room`);
   });
 
-  socket.on("sendMessage", async (data) => {
-    try {
-      const message = await prisma.message.create({
-        data: {
-          content: data.content,
-          sender: { connect: { id: data.senderId } },
-          recipient: { connect: { id: data.recipientId } },
-          conversation: { connect: { id: data.conversationId } },
-        },
-        include: {
-          sender: {
-            select: {
-              id: true,
-              username: true,
-              profilePicture: true,
-            },
-          },
-        },
-      });
-
-      io.to(data.recipientId).emit("newMessage", message);
-      socket.emit("messageSent", message);
-    } catch (error) {
-      console.error("Error saving message:", error);
-      socket.emit("messageError", { error: "Failed to send message" });
-    }
+  socket.on("leave", (userId: string) => {
+    socket.leave(userId);
+    console.log(`User ${userId} left their room`);
   });
 
   socket.on("disconnect", () => {
@@ -233,27 +168,23 @@ io.on("connection", (socket: Socket) => {
   });
 });
 
-// Error Handler Middleware (last middleware)
+// Error handling
 app.use(errorHandler);
 
-// Start server
-const PORT = process.env.PORT || 5001;
 async function startServer() {
   try {
+    // Test database connection
     await prisma.$connect();
     console.log("✅ Connected to database");
 
-    httpServer.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
-
-    process.on("SIGINT", async () => {
-      await prisma.$disconnect();
-      console.log("🛑 Gracefully shutting down");
-      process.exit(0);
+    // Start server
+    const port = process.env.PORT || 5001;
+    httpServer.listen(port, () => {
+      console.log(`🚀 Server running on port ${port}`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
+    process.exit(1);
   }
 }
 
