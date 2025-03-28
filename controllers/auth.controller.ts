@@ -30,6 +30,11 @@ const signToken = (userId: string): string => {
 // Register a New User
 export const register = async (req: Request, res: Response) => {
   try {
+    console.log("Registration request received:", {
+      body: req.body,
+      headers: req.headers
+    });
+
     // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -56,7 +61,14 @@ export const register = async (req: Request, res: Response) => {
       console.log(`Registration failed: ${field} already exists`);
       return res.status(400).json({
         success: false,
-        message: `This ${field} is already registered.`
+        message: `This ${field} is already registered.`,
+        errors: [{
+          type: "field",
+          value: field === "email" ? email : username,
+          msg: `This ${field} is already registered.`,
+          path: field,
+          location: "body"
+        }]
       });
     }
 
@@ -64,24 +76,26 @@ export const register = async (req: Request, res: Response) => {
     try {
       const salt = await bcrypt.genSalt(12);
       const hashedPassword = await bcrypt.hash(password, salt);
+      
+      console.log("Creating new user with username:", username);
       const user = await prisma.user.create({
         data: {
           username,
           email,
           password: hashedPassword,
-          role: 'USER', // Add default role
+          role: 'USER',
         },
       });
 
-      // Generate token
+      // Generate tokens
       const accessToken = signToken(user.id);
       const refreshToken = jwt.sign(
         { id: user.id },
         process.env.JWT_SECRET || '',
         { expiresIn: "30d" }
       );
-      console.log("Registration successful for:", email);
 
+      console.log("Registration successful for:", email);
       return res.status(201).json({
         success: true,
         data: {
@@ -89,31 +103,39 @@ export const register = async (req: Request, res: Response) => {
             id: user.id,
             username: user.username,
             email: user.email,
+            role: user.role,
             profilePicture: user.profilePicture,
           },
           tokens: {
             accessToken,
             refreshToken,
-          },
-        },
-      });
-    } catch (err) {
-      console.error("Database Error during registration:", err);
-      if (err instanceof prisma.PrismaClientKnownRequestError) {
-        if (err.code === 'P2002') {
-          return res.status(400).json({
-            success: false,
-            message: "This email or username is already registered."
-          });
+          }
         }
-      }
-      throw err;
+      });
+    } catch (error: any) {
+      console.error("Database error during user creation:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error creating user account",
+        errors: [{
+          type: "server",
+          msg: error.message || "Internal server error",
+          path: "database",
+          location: "server"
+        }]
+      });
     }
-  } catch (error) {
-    console.error("Registration Error:", error);
+  } catch (error: any) {
+    console.error("Registration error:", error);
     return res.status(500).json({
       success: false,
-      message: "An error occurred during registration."
+      message: "Registration failed",
+      errors: [{
+        type: "server",
+        msg: error.message || "Internal server error",
+        path: "server",
+        location: "server"
+      }]
     });
   }
 };
