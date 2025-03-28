@@ -31,42 +31,43 @@ if (process.env.NODE_ENV === "development") {
 
 // Middleware: CORS
 const allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:3000",
   "https://tijara-frontend.vercel.app",
   "https://tijara-frontend-git-main.vercel.app",
   "https://tijara-frontend-*.vercel.app",
-  "http://localhost:5173" // Vite dev server
-];
+  ...(process.env.NODE_ENV === "development" 
+    ? ["http://localhost:3000", "http://localhost:5173"] 
+    : [])
+].filter(Boolean); // Filter out undefined values
 
-app.use(
-  cors({
-    origin: function(origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      // Check if the origin is in our allowed list
-      if (allowedOrigins.some(allowedOrigin => {
-        // Handle wildcard domains
-        if (allowedOrigin.includes('*')) {
-          const pattern = new RegExp('^' + allowedOrigin.replace('*', '.*') + '$');
-          return pattern.test(origin);
-        }
-        return allowedOrigin === origin;
-      })) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (!allowedOrigin) return false;
+      if (allowedOrigin.includes("*")) {
+        const pattern = new RegExp(
+          "^" + allowedOrigin.replace("*", ".*") + "$"
+        );
+        return pattern.test(origin);
       }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-    exposedHeaders: ["set-cookie"]
-  })
-);
+      return allowedOrigin === origin;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log(`Blocked origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+}));
 
 // Enable pre-flight requests for all routes
-app.options('*', cors());
+app.options("*", cors());
 
 // Middleware: Body parsers
 app.use(express.json({ limit: "10mb" }));
@@ -78,13 +79,13 @@ app.use(cookieParser());
 // Configure secure cookie settings
 app.use((req, res, next) => {
   res.cookie = res.cookie.bind(res);
-  const originalSetCookie = res.setHeader.bind(res, 'Set-Cookie');
-  res.setHeader = function(name: string, value: any) {
-    if (name.toLowerCase() === 'set-cookie') {
+  const originalSetCookie = res.setHeader.bind(res, "Set-Cookie");
+  res.setHeader = function (name: string, value: any) {
+    if (name.toLowerCase() === "set-cookie") {
       if (Array.isArray(value)) {
-        value = value.map(v => v + '; SameSite=None; Secure');
-      } else if (typeof value === 'string') {
-        value = value + '; SameSite=None; Secure';
+        value = value.map((v) => v + "; SameSite=None; Secure");
+      } else if (typeof value === "string") {
+        value = value + "; SameSite=None; Secure";
       }
     }
     return originalSetCookie(value);
@@ -101,7 +102,10 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Static: Uploads folder
-app.use("/uploads", express.static(new URL("uploads", import.meta.url).pathname));
+app.use(
+  "/uploads",
+  express.static(new URL("uploads", import.meta.url).pathname),
+);
 
 // Health Check
 app.get("/health", (req: Request, res: Response) => {

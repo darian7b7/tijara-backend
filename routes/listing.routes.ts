@@ -8,33 +8,41 @@ import {
   processImagesMiddleware,
 } from "../middleware/upload.middleware.js";
 import { Prisma, ListingStatus } from "@prisma/client";
-import { AuthRequest, ProcessedImage, ListingCreateInput, ListingUpdateInput } from "../types/shared.js";
+import {
+  AuthRequest,
+  ProcessedImage,
+  ListingCreateInput,
+  ListingUpdateInput,
+} from "../types/shared.js";
 
 const router = express.Router();
 
 const formatListingResponse = (listing: any) => {
   if (!listing) return null;
-  
+
   return {
     id: listing.id,
     title: listing.title,
     description: listing.description,
     price: listing.price,
-    location: listing.location || '',
+    location: listing.location || "",
     category: listing.category,
     images: listing.images?.map((img: any) => img.url) || [],
     createdAt: listing.createdAt,
     updatedAt: listing.updatedAt,
     status: listing.status,
-    seller: listing.user ? {
-      id: listing.user.id,
-      username: listing.user.username,
-      profilePicture: listing.user.profilePicture,
-    } : undefined,
-    savedBy: listing.favorites?.map((fav: any) => ({
-      id: fav.id,
-      userId: fav.userId,
-    })) || [],
+    seller: listing.user
+      ? {
+          id: listing.user.id,
+          username: listing.user.username,
+          profilePicture: listing.user.profilePicture,
+        }
+      : undefined,
+    savedBy:
+      listing.favorites?.map((fav: any) => ({
+        id: fav.id,
+        userId: fav.userId,
+      })) || [],
     attributes: listing.attributes,
     features: listing.features,
   };
@@ -64,17 +72,18 @@ router.get("/", async (req: Request, res: Response) => {
         total: listings.length,
         page: 1,
         limit: 10,
-        hasMore: false
+        hasMore: false,
       },
-      status: 200
+      status: 200,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
     res.status(500).json({
       success: false,
       error: errorMessage,
       status: 500,
-      data: null
+      data: null,
     });
   }
 });
@@ -85,18 +94,21 @@ router.get("/search", async (req: Request, res: Response) => {
 
     const where: Prisma.ListingWhereInput = {
       status: "ACTIVE",
-      ...(query && typeof query === 'string' && {
-        OR: [
-          { title: { contains: query, mode: "insensitive" } },
-          { description: { contains: query, mode: "insensitive" } },
-        ],
-      }),
-      ...(category && typeof category === 'string' && { category }),
+      ...(query &&
+        typeof query === "string" && {
+          OR: [
+            { title: { contains: query, mode: "insensitive" } },
+            { description: { contains: query, mode: "insensitive" } },
+          ],
+        }),
+      ...(category && typeof category === "string" && { category }),
       ...(minPrice || maxPrice
         ? {
             price: {
-              ...(minPrice && typeof minPrice === 'string' && { gte: parseFloat(minPrice) }),
-              ...(maxPrice && typeof maxPrice === 'string' && { lte: parseFloat(maxPrice) }),
+              ...(minPrice &&
+                typeof minPrice === "string" && { gte: parseFloat(minPrice) }),
+              ...(maxPrice &&
+                typeof maxPrice === "string" && { lte: parseFloat(maxPrice) }),
             },
           }
         : {}),
@@ -118,26 +130,27 @@ router.get("/search", async (req: Request, res: Response) => {
         },
         orderBy: { createdAt: "desc" },
       }),
-      prisma.listing.count({ where })
+      prisma.listing.count({ where }),
     ]);
 
     res.json({
       success: true,
       data: {
-        items: listings.map(listing => formatListingResponse(listing)),
+        items: listings.map((listing) => formatListingResponse(listing)),
         total,
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 10,
-        hasMore: total > (parseInt(req.query.limit as string) || 10)
+        hasMore: total > (parseInt(req.query.limit as string) || 10),
       },
-      status: 200
+      status: 200,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : "Error searching listings",
+      error:
+        error instanceof Error ? error.message : "Error searching listings",
       status: 500,
-      data: null
+      data: null,
     });
   }
 });
@@ -163,15 +176,16 @@ router.get("/trending", async (_req: Request, res: Response) => {
     res.json({
       success: true,
       data: { items: trendingListings },
-      status: 200
+      status: 200,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    res.status(500).json({ 
-      success: false, 
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({
+      success: false,
       error: errorMessage,
       status: 500,
-      data: null 
+      data: null,
     });
   }
 });
@@ -183,11 +197,11 @@ router.get("/saved", async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        error: "Authentication required", 
+      return res.status(401).json({
+        success: false,
+        error: "Authentication required",
         status: 401,
-        data: null
+        data: null,
       });
     }
 
@@ -210,21 +224,22 @@ router.get("/saved", async (req: Request, res: Response) => {
       },
     });
 
-    const formattedListings = savedListings.map(favorite => 
-      formatListingResponse(favorite.listing)
+    const formattedListings = savedListings.map((favorite) =>
+      formatListingResponse(favorite.listing),
     );
 
     res.json({
       success: true,
       data: { items: formattedListings },
-      status: 200
+      status: 200,
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : "An unknown error occurred",
+    res.status(500).json({
+      success: false,
+      error:
+        error instanceof Error ? error.message : "An unknown error occurred",
       status: 500,
-      data: null
+      data: null,
     });
   }
 });
@@ -237,13 +252,13 @@ router.post(
     try {
       const authReq = req as AuthRequest;
       const userId = authReq.user?.id;
-      
+
       if (!userId) {
-        return res.status(401).json({ 
-          success: false, 
-          error: "Authentication required", 
+        return res.status(401).json({
+          success: false,
+          error: "Authentication required",
           status: 401,
-          data: null
+          data: null,
         });
       }
 
@@ -277,16 +292,20 @@ router.post(
             })),
           },
           attributes: {
-            create: attributes.map((attr: { definitionId: string; value: string }) => ({
-              attributeDefinitionId: attr.definitionId,
-              value: attr.value,
-            })),
+            create: attributes.map(
+              (attr: { definitionId: string; value: string }) => ({
+                attributeDefinitionId: attr.definitionId,
+                value: attr.value,
+              }),
+            ),
           },
           features: {
-            create: features.map((feat: { definitionId: string; value: string }) => ({
-              featureDefinitionId: feat.definitionId,
-              value: feat.value,
-            })),
+            create: features.map(
+              (feat: { definitionId: string; value: string }) => ({
+                featureDefinitionId: feat.definitionId,
+                value: feat.value,
+              }),
+            ),
           },
         },
         include: {
@@ -304,21 +323,22 @@ router.post(
         },
       });
 
-      res.status(201).json({ 
-        success: true, 
-        data: formatListingResponse(listing), 
-        status: 201 
+      res.status(201).json({
+        success: true,
+        data: formatListingResponse(listing),
+        status: 201,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      res.status(500).json({ 
-        success: false, 
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({
+        success: false,
         error: errorMessage,
         status: 500,
-        data: null 
+        data: null,
       });
     }
-  }
+  },
 );
 
 router.get("/:id", async (req, res) => {
@@ -339,25 +359,25 @@ router.get("/:id", async (req, res) => {
     });
 
     if (!listing) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
         error: "Listing not found",
         status: 404,
-        data: null
+        data: null,
       });
     }
 
     res.json({
       success: true,
       data: formatListingResponse(listing),
-      status: 200
+      status: 200,
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
       status: 500,
-      data: null
+      data: null,
     });
   }
 });
@@ -369,7 +389,7 @@ router.put(
   async (req: Request, res: Response) => {
     try {
       const authReq = req as AuthRequest;
-      
+
       const {
         title,
         description,
@@ -379,7 +399,7 @@ router.put(
         attributes = [],
         features = [],
       } = req.body;
-      
+
       const newImages = authReq.processedImages || [];
       const existingImages = req.body.existingImages || [];
 
@@ -408,17 +428,21 @@ router.put(
           },
           attributes: {
             deleteMany: {},
-            create: attributes.map((attr: { definitionId: string; value: string }) => ({
-              attributeDefinitionId: attr.definitionId,
-              value: attr.value,
-            })),
+            create: attributes.map(
+              (attr: { definitionId: string; value: string }) => ({
+                attributeDefinitionId: attr.definitionId,
+                value: attr.value,
+              }),
+            ),
           },
           features: {
             deleteMany: {},
-            create: features.map((feat: { definitionId: string; value: string }) => ({
-              featureDefinitionId: feat.definitionId,
-              value: feat.value,
-            })),
+            create: features.map(
+              (feat: { definitionId: string; value: string }) => ({
+                featureDefinitionId: feat.definitionId,
+                value: feat.value,
+              }),
+            ),
           },
         },
         include: {
@@ -437,14 +461,14 @@ router.put(
       res.json({
         success: true,
         data: formatListingResponse(listing),
-        status: 200
+        status: 200,
       });
     } catch (error) {
-      res.status(500).json({ 
+      res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
         status: 500,
-        data: null
+        data: null,
       });
     }
   },
@@ -457,11 +481,11 @@ router.delete("/:id", async (req, res) => {
     });
     res.status(204).send();
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
       status: 500,
-      data: null
+      data: null,
     });
   }
 });

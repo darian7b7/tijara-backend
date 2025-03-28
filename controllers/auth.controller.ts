@@ -20,7 +20,7 @@ interface AuthTokens {
 
 const signToken = (userId: string): string => {
   if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET is not defined');
+    throw new Error("JWT_SECRET is not defined");
   }
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: "7d",
@@ -32,7 +32,7 @@ export const register = async (req: Request, res: Response) => {
   try {
     console.log("Registration request received:", {
       body: req.body,
-      headers: req.headers
+      headers: req.headers,
     });
 
     // Validate request
@@ -42,7 +42,7 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
 
@@ -62,13 +62,15 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         message: `This ${field} is already registered.`,
-        errors: [{
-          type: "field",
-          value: field === "email" ? email : username,
-          msg: `This ${field} is already registered.`,
-          path: field,
-          location: "body"
-        }]
+        errors: [
+          {
+            type: "field",
+            value: field === "email" ? email : username,
+            msg: `This ${field} is already registered.`,
+            path: field,
+            location: "body",
+          },
+        ],
       });
     }
 
@@ -76,14 +78,14 @@ export const register = async (req: Request, res: Response) => {
     try {
       const salt = await bcrypt.genSalt(12);
       const hashedPassword = await bcrypt.hash(password, salt);
-      
+
       console.log("Creating new user with username:", username);
       const user = await prisma.user.create({
         data: {
           username,
           email,
           password: hashedPassword,
-          role: 'USER',
+          role: "USER",
         },
       });
 
@@ -91,8 +93,8 @@ export const register = async (req: Request, res: Response) => {
       const accessToken = signToken(user.id);
       const refreshToken = jwt.sign(
         { id: user.id },
-        process.env.JWT_SECRET || '',
-        { expiresIn: "30d" }
+        process.env.JWT_SECRET || "",
+        { expiresIn: "30d" },
       );
 
       console.log("Registration successful for:", email);
@@ -109,20 +111,22 @@ export const register = async (req: Request, res: Response) => {
           tokens: {
             accessToken,
             refreshToken,
-          }
-        }
+          },
+        },
       });
     } catch (error: any) {
       console.error("Database error during user creation:", error);
       return res.status(500).json({
         success: false,
         message: "Error creating user account",
-        errors: [{
-          type: "server",
-          msg: error.message || "Internal server error",
-          path: "database",
-          location: "server"
-        }]
+        errors: [
+          {
+            type: "server",
+            msg: error.message || "Internal server error",
+            path: "database",
+            location: "server",
+          },
+        ],
       });
     }
   } catch (error: any) {
@@ -130,12 +134,14 @@ export const register = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "Registration failed",
-      errors: [{
-        type: "server",
-        msg: error.message || "Internal server error",
-        path: "server",
-        location: "server"
-      }]
+      errors: [
+        {
+          type: "server",
+          msg: error.message || "Internal server error",
+          path: "server",
+          location: "server",
+        },
+      ],
     });
   }
 };
@@ -150,7 +156,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
 
@@ -174,7 +180,7 @@ export const login = async (req: Request, res: Response) => {
       console.log("Login failed: User not found -", email);
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password"
+        message: "Invalid email or password",
       });
     }
 
@@ -184,7 +190,7 @@ export const login = async (req: Request, res: Response) => {
       console.log("Login failed: Invalid password -", email);
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password"
+        message: "Invalid email or password",
       });
     }
 
@@ -192,8 +198,8 @@ export const login = async (req: Request, res: Response) => {
     const accessToken = signToken(user.id);
     const refreshToken = jwt.sign(
       { id: user.id },
-      process.env.JWT_SECRET || '',
-      { expiresIn: "30d" }
+      process.env.JWT_SECRET || "",
+      { expiresIn: "30d" },
     );
     console.log("Login successful for:", email);
 
@@ -217,7 +223,7 @@ export const login = async (req: Request, res: Response) => {
     console.error("Login Error:", error);
     return res.status(500).json({
       success: false,
-      message: "An error occurred during login."
+      message: "An error occurred during login.",
     });
   }
 };
@@ -228,7 +234,7 @@ export const logout = (_req: Request, res: Response) => {
     success: true,
     data: null,
     message: "Logged out successfully",
-    status: 200
+    status: 200,
   });
 };
 
@@ -251,21 +257,21 @@ export const getMe = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({
         success: false,
         error: "User not found",
-        status: 404
+        status: 404,
       });
     }
 
     res.json({
       success: true,
       data: { user },
-      status: 200
+      status: 200,
     });
   } catch (error) {
     console.error("Error fetching user details:", error);
     return res.status(500).json({
       success: false,
       error: "Error fetching user details",
-      status: 500
+      status: 500,
     });
   }
 };

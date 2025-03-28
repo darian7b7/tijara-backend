@@ -14,7 +14,7 @@ interface AuthRequest extends Request {
     role: string;
   };
   files?: Express.Multer.File[];
-  processedImages?: Array<{ url: string; order: number; }>;
+  processedImages?: Array<{ url: string; order: number }>;
 }
 
 type ListingWithRelations = Prisma.ListingGetPayload<{
@@ -39,7 +39,7 @@ interface UploadResult {
 
 const formatListingResponse = (listing: ListingWithRelations | null) => {
   if (!listing) return null;
-  
+
   return {
     id: listing.id,
     title: listing.title,
@@ -47,16 +47,18 @@ const formatListingResponse = (listing: ListingWithRelations | null) => {
     price: listing.price,
     location: listing.location,
     category: listing.category,
-    images: listing.images.map(img => img.url),
+    images: listing.images.map((img) => img.url),
     createdAt: listing.createdAt,
     updatedAt: listing.updatedAt,
     status: listing.status,
-    seller: listing.user ? {
-      id: listing.user.id,
-      username: listing.user.username,
-      profilePicture: listing.user.profilePicture,
-    } : undefined,
-    savedBy: listing.favorites.map(fav => ({
+    seller: listing.user
+      ? {
+          id: listing.user.id,
+          username: listing.user.username,
+          profilePicture: listing.user.profilePicture,
+        }
+      : undefined,
+    savedBy: listing.favorites.map((fav) => ({
       id: fav.id,
       userId: fav.userId,
     })),
@@ -77,17 +79,21 @@ const validateListingData = (data: any): string[] => {
 
   // Specific category validation
   const requiredFields = {
-    "vehicles": ["vehicleType", "make", "model", "year"],
+    vehicles: ["vehicleType", "make", "model", "year"],
     "real-estate": ["propertyType", "size", "bedrooms", "bathrooms"],
   };
 
-  const categoryFields = requiredFields[data.category.mainCategory as keyof typeof requiredFields] || [];
+  const categoryFields =
+    requiredFields[data.category.mainCategory as keyof typeof requiredFields] ||
+    [];
   const missingFields = categoryFields.filter(
     (field) => !data.details?.[field],
   );
 
   if (missingFields.length > 0) {
-    errors.push(`Missing required fields for ${data.category.mainCategory}: ${missingFields.join(", ")}`);
+    errors.push(
+      `Missing required fields for ${data.category.mainCategory}: ${missingFields.join(", ")}`,
+    );
   }
 
   return errors;
@@ -95,7 +101,16 @@ const validateListingData = (data: any): string[] => {
 
 export const createListing = async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, price, category, location, condition, attributes, features } = req.body;
+    const {
+      title,
+      description,
+      price,
+      category,
+      location,
+      condition,
+      attributes,
+      features,
+    } = req.body;
     const errors = validateListingData(req.body);
 
     if (errors.length > 0) {
@@ -104,7 +119,7 @@ export const createListing = async (req: AuthRequest, res: Response) => {
         error: "Validation failed",
         errors,
         status: 400,
-        data: null
+        data: null,
       });
     }
 
@@ -119,17 +134,22 @@ export const createListing = async (req: AuthRequest, res: Response) => {
         status: ListingStatus.ACTIVE,
         userId: req.user.id,
         images: {
-          create: req.processedImages?.map(img => ({
-            url: img.url,
-            order: img.order,
-          })) || [],
+          create:
+            req.processedImages?.map((img) => ({
+              url: img.url,
+              order: img.order,
+            })) || [],
         },
-        attributes: attributes ? {
-          create: attributes
-        } : undefined,
-        features: features ? {
-          create: features
-        } : undefined,
+        attributes: attributes
+          ? {
+              create: attributes,
+            }
+          : undefined,
+        features: features
+          ? {
+              create: features,
+            }
+          : undefined,
       },
       include: {
         user: {
@@ -149,7 +169,7 @@ export const createListing = async (req: AuthRequest, res: Response) => {
     const response: APIResponse<any> = {
       success: true,
       data: formatListingResponse(listing),
-      status: 201
+      status: 201,
     };
 
     res.status(201).json(response);
@@ -159,7 +179,7 @@ export const createListing = async (req: AuthRequest, res: Response) => {
       success: false,
       error: error instanceof Error ? error.message : "Error creating listing",
       status: 500,
-      data: null
+      data: null,
     });
   }
 };
@@ -167,19 +187,26 @@ export const createListing = async (req: AuthRequest, res: Response) => {
 export const getListings = async (req: AuthRequest, res: Response) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 12));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(req.query.limit as string) || 12),
+    );
     const search = (req.query.search as string) || "";
     const category = (req.query.category as string) || "";
     const minPrice = parseFloat(req.query.minPrice as string) || 0;
-    const maxPrice = parseFloat(req.query.maxPrice as string) || Number.MAX_SAFE_INTEGER;
+    const maxPrice =
+      parseFloat(req.query.maxPrice as string) || Number.MAX_SAFE_INTEGER;
     const sortBy = (req.query.sortBy as string) || "createdAt";
-    const sortOrder = (req.query.sortOrder as string)?.toLowerCase() === "asc" ? "asc" : "desc";
+    const sortOrder =
+      (req.query.sortOrder as string)?.toLowerCase() === "asc" ? "asc" : "desc";
 
     const where: Prisma.ListingWhereInput = {
-      OR: search ? [
-        { title: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-      ] : undefined,
+      OR: search
+        ? [
+            { title: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
+          ]
+        : undefined,
       category: category || undefined,
       price: {
         gte: minPrice,
@@ -211,7 +238,9 @@ export const getListings = async (req: AuthRequest, res: Response) => {
       prisma.listing.count({ where }),
     ]);
 
-    const formattedListings = listings.map(listing => formatListingResponse(listing as ListingWithRelations));
+    const formattedListings = listings.map((listing) =>
+      formatListingResponse(listing as ListingWithRelations),
+    );
 
     res.json({
       success: true,
@@ -265,7 +294,7 @@ export const getListing = async (req: AuthRequest, res: Response) => {
         listing.userId,
         "LISTING_INTEREST",
         listing.id,
-        `${req.user.username} viewed your listing "${listing.title}"`
+        `${req.user.username} viewed your listing "${listing.title}"`,
       );
     }
 
@@ -285,8 +314,17 @@ export const getListing = async (req: AuthRequest, res: Response) => {
 export const updateListing = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, description, price, category, location, condition, attributes, features } = req.body;
-    
+    const {
+      title,
+      description,
+      price,
+      category,
+      location,
+      condition,
+      attributes,
+      features,
+    } = req.body;
+
     const listing = await prisma.listing.update({
       where: { id },
       data: {
@@ -296,21 +334,27 @@ export const updateListing = async (req: AuthRequest, res: Response) => {
         category,
         location,
         condition,
-        attributes: attributes ? {
-          deleteMany: {},
-          create: attributes
-        } : undefined,
-        features: features ? {
-          deleteMany: {},
-          create: features
-        } : undefined,
-        images: req.processedImages ? {
-          deleteMany: {},
-          create: req.processedImages.map(img => ({
-            url: img.url,
-            order: img.order,
-          }))
-        } : undefined
+        attributes: attributes
+          ? {
+              deleteMany: {},
+              create: attributes,
+            }
+          : undefined,
+        features: features
+          ? {
+              deleteMany: {},
+              create: features,
+            }
+          : undefined,
+        images: req.processedImages
+          ? {
+              deleteMany: {},
+              create: req.processedImages.map((img) => ({
+                url: img.url,
+                order: img.order,
+              })),
+            }
+          : undefined,
       },
       include: {
         user: {
@@ -330,7 +374,7 @@ export const updateListing = async (req: AuthRequest, res: Response) => {
     res.json({
       success: true,
       data: formatListingResponse(listing as ListingWithRelations),
-      status: 200
+      status: 200,
     });
   } catch (error) {
     console.error("Error updating listing:", error);
@@ -338,7 +382,7 @@ export const updateListing = async (req: AuthRequest, res: Response) => {
       success: false,
       error: error instanceof Error ? error.message : "Error updating listing",
       status: 500,
-      data: null
+      data: null,
     });
   }
 };
@@ -446,7 +490,7 @@ export const toggleSaveListing = async (req: AuthRequest, res: Response) => {
           listing.userId,
           "LISTING_INTEREST",
           listing.id,
-          `${req.user.username} saved your listing "${listing.title}"`
+          `${req.user.username} saved your listing "${listing.title}"`,
         );
       }
     }

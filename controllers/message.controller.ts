@@ -13,19 +13,19 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
           {
             participants: {
               some: {
-                id: senderId
-              }
-            }
+                id: senderId,
+              },
+            },
           },
           {
             participants: {
               some: {
-                id: receiverId
-              }
-            }
+                id: receiverId,
+              },
+            },
           },
-          { listingId }
-        ]
+          { listingId },
+        ],
       },
     });
 
@@ -33,10 +33,7 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       conversation = await prisma.conversation.create({
         data: {
           participants: {
-            connect: [
-              { id: senderId },
-              { id: receiverId }
-            ]
+            connect: [{ id: senderId }, { id: receiverId }],
           },
           listingId,
           lastMessage: null,
@@ -50,16 +47,16 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         content,
         senderId,
         recipientId: receiverId,
-        conversationId: conversation.id
+        conversationId: conversation.id,
       },
       include: {
         sender: {
           select: {
             id: true,
             username: true,
-            profilePicture: true
-          }
-        }
+            profilePicture: true,
+          },
+        },
       },
     });
 
@@ -92,9 +89,9 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
       where: {
         participants: {
           some: {
-            id: req.user.id
-          }
-        }
+            id: req.user.id,
+          },
+        },
       },
       include: {
         messages: {
@@ -125,25 +122,25 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
 export const getMessages = async (req: AuthRequest, res: Response) => {
   try {
     const { conversationId } = req.params;
-    const { page = "1", limit = "20" } = req.query as { page?: string; limit?: string };
+    const { page = "1", limit = "20" } = req.query as {
+      page?: string;
+      limit?: string;
+    };
     const skip = (Number(page) - 1) * Number(limit);
 
     const messages = await prisma.message.findMany({
       where: {
         conversationId,
-        OR: [
-          { senderId: req.user.id },
-          { recipientId: req.user.id }
-        ]
+        OR: [{ senderId: req.user.id }, { recipientId: req.user.id }],
       },
       include: {
         sender: {
           select: {
             id: true,
             username: true,
-            profilePicture: true
-          }
-        }
+            profilePicture: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -157,10 +154,10 @@ export const getMessages = async (req: AuthRequest, res: Response) => {
       where: {
         conversationId,
         recipientId: req.user.id,
-        read: false
+        read: false,
       },
       data: {
-        read: true
+        read: true,
       },
     });
 

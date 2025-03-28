@@ -1,5 +1,5 @@
-import { Request } from 'express';
-import { Prisma } from '@prisma/client';
+import { Request } from "express";
+import { Prisma } from "@prisma/client";
 
 export interface AuthRequest extends Request {
   user: {
@@ -12,7 +12,7 @@ export interface AuthRequest extends Request {
 
 export interface UserPreferences {
   language: string;
-  theme: 'light' | 'dark';
+  theme: "light" | "dark";
   notifications: {
     enabledTypes: string[];
     emailNotifications: boolean;
@@ -38,6 +38,6 @@ export interface ConversationData {
   listingId?: string;
 }
 
-export type preferences = null
+export type preferences = null;
 
 export type InputJsonValue = Prisma.InputJsonValue;

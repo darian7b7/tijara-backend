@@ -7,28 +7,21 @@ import {
   register,
   logout,
 } from "../controllers/auth.controller.js";
+import { validateRegistration, validate } from "../middleware/validation.middleware.js";
 
 const router = express.Router();
 
 // Type-safe request handler wrapper
-const asyncHandler = (fn: Function) => (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
+const asyncHandler =
+  (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
 
 // Register Route with Validation
 router.post(
   "/register",
-  [
-    body("username").trim().notEmpty().withMessage("Username is required"),
-    body("email").isEmail().withMessage("Please enter a valid email"),
-    body("password")
-      .isLength({ min: 6 })
-      .withMessage("Password must be at least 6 characters"),
-  ],
+  validateRegistration,
+  validate,
   asyncHandler(register)
 );
 
@@ -39,7 +32,7 @@ router.post(
     body("email").isEmail().withMessage("Please enter a valid email"),
     body("password").notEmpty().withMessage("Password is required"),
   ],
-  asyncHandler(login)
+  asyncHandler(login),
 );
 
 // Logout Route

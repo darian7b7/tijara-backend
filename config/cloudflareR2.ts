@@ -19,7 +19,10 @@ const s3 = new S3Client({
 });
 
 // ✅ Upload File to Cloudflare R2
-export const uploadToR2 = async (file: Express.Multer.File, category: string) => {
+export const uploadToR2 = async (
+  file: Express.Multer.File,
+  category: string,
+) => {
   const folder = category === "avatar" ? "avatars/" : "listings/";
   const fileKey = `${folder}${crypto.randomUUID()}-${file.originalname.replace(/\s/g, "-")}`;
 

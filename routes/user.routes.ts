@@ -5,7 +5,7 @@ import {
   getUserProfile,
   getUserListings,
   getUserSettings,
-  updateUserSettings
+  updateUserSettings,
 } from "../controllers/user.controller.js";
 import {
   upload,
@@ -27,26 +27,22 @@ interface AuthRequest extends Request {
 const router = express.Router();
 
 // Type-safe request handler wrapper
-const asyncHandler = (fn: (req: AuthRequest, res: Response, next: NextFunction) => Promise<any>) => (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  Promise.resolve(fn(req as AuthRequest, res, next)).catch(next);
-};
+const asyncHandler =
+  (fn: (req: AuthRequest, res: Response, next: NextFunction) => Promise<any>) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req as AuthRequest, res, next)).catch(next);
+  };
 
 // Middleware to process profile picture
-const processProfilePicture = asyncHandler(async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  if (req.file) {
-    // Upload processed image to R2
-    req.body.profilePicture = await uploadToR2(req.file, "avatar");
-  }
-  next();
-});
+const processProfilePicture = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.file) {
+      // Upload processed image to R2
+      req.body.profilePicture = await uploadToR2(req.file, "avatar");
+    }
+    next();
+  },
+);
 
 // ✅ Ensure all routes require authentication
 router.use(protect);
@@ -59,7 +55,7 @@ router.put(
   "/profile",
   upload.single("profilePicture"),
   processProfilePicture,
-  asyncHandler(updateProfile)
+  asyncHandler(updateProfile),
 );
 
 // ✅ Get user settings

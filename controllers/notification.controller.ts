@@ -13,7 +13,7 @@ export const createNotification = async (
   userId: string,
   type: NotificationType,
   relatedId: string,
-  content: string
+  content: string,
 ) => {
   try {
     if (!validateNotificationType(type)) {
@@ -42,7 +42,10 @@ export const createNotification = async (
 export const getNotifications = async (req: AuthRequest, res: Response) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.max(1, Math.min(50, parseInt(req.query.limit as string) || 20));
+    const limit = Math.max(
+      1,
+      Math.min(50, parseInt(req.query.limit as string) || 20),
+    );
     const skip = (page - 1) * limit;
 
     const notifications = await prisma.notification.findMany({
@@ -169,7 +172,10 @@ export const deleteNotification = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const clearAllNotifications = async (req: AuthRequest, res: Response) => {
+export const clearAllNotifications = async (
+  req: AuthRequest,
+  res: Response,
+) => {
   try {
     const result = await prisma.notification.deleteMany({
       where: { userId: req.user.id },

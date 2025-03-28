@@ -9,7 +9,7 @@ const errorHandler: ErrorRequestHandler = (
   err: CustomError,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   console.error("💥 Error Handler:", err.stack);
 
@@ -20,4 +20,3 @@ const errorHandler: ErrorRequestHandler = (
 };
 
 export default errorHandler;
-

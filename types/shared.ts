@@ -43,28 +43,28 @@ export interface ListingUpdateInput {
 
 export enum ListingCategory {
   VEHICLES = "VEHICLES",
-  REAL_ESTATE = "REAL_ESTATE"
+  REAL_ESTATE = "REAL_ESTATE",
 }
 
 export enum VehicleType {
   CARS = "CARS",
   MOTORCYCLES = "MOTORCYCLES",
   BOATS = "BOATS",
-  OTHER = "OTHER"
+  OTHER = "OTHER",
 }
 
 export enum PropertyType {
   HOUSE = "HOUSE",
   APARTMENT = "APARTMENT",
   LAND = "LAND",
-  OTHER = "OTHER"
+  OTHER = "OTHER",
 }
 
 export enum ListingStatus {
   ACTIVE = "ACTIVE",
   INACTIVE = "INACTIVE",
   PENDING = "PENDING",
-  SOLD = "SOLD"
+  SOLD = "SOLD",
 }
 
 export interface Location {
@@ -130,4 +130,4 @@ export interface PaginatedData<T> {
   hasMore: boolean;
 }
 
-export interface PaginatedResponse<T> extends APIResponse<PaginatedData<T>> {} 
+export interface PaginatedResponse<T> extends APIResponse<PaginatedData<T>> {}
