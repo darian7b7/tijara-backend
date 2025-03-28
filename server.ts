@@ -30,41 +30,26 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Middleware: CORS
-const allowedOrigins = [
-  "https://tijara-frontend.vercel.app",
-  "https://tijara-frontend-git-main.vercel.app",
-  "https://tijara-frontend-*.vercel.app",
-  ...(process.env.NODE_ENV === "development" 
-    ? ["http://localhost:3000", "http://localhost:5173"] 
-    : [])
-].filter(Boolean); // Filter out undefined values
-
 app.use(cors({
   origin: function (origin, callback) {
     console.log("🌐 CORS Request from:", origin);
-    if (!origin) return callback(null, true);
     
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      if (!allowedOrigin) return false;
-      if (allowedOrigin.includes("*")) {
-        const pattern = new RegExp(
-          "^" + allowedOrigin.replace("*", ".*") + "$"
-        );
-        return pattern.test(origin);
-      }
-      return allowedOrigin === origin;
-    });
+    const allowedOrigins = [
+      'https://tijara-frontend.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:5173'
+    ];
 
-    if (isAllowed) {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log(`Blocked origin: ${origin}`);
-      callback(new Error("Not allowed by CORS"));
+      console.log(`❌ Blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // Enable pre-flight requests for all routes
@@ -141,26 +126,42 @@ import messageRoutes from "./routes/message.routes.js";
 import uploadRoutes from "./routes/uploads.js";
 import notificationRoutes from "./routes/notification.routes.js";
 
-// Register Routes with /api prefix
+// Create API router
 const apiRouter = express.Router();
 
-// Mount all routes on the API router
+// Mount routes on API router
 apiRouter.use("/auth", authRoutes);
 apiRouter.use("/listings", listingRoutes);
 apiRouter.use("/users", userRoutes);
-apiRouter.use("/messaging", messageRoutes);
+apiRouter.use("/messages", messageRoutes);
 apiRouter.use("/uploads", uploadRoutes);
 apiRouter.use("/notifications", notificationRoutes);
 
-// Mount the API router at /api
+// Mount API router at /api
 app.use("/api", apiRouter);
 
-// Add a catch-all route for debugging
+// Add debug middleware to log all requests
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`📥 ${req.method} ${req.path}`, {
+    body: req.body,
+    query: req.query,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers.authorization ? 'Bearer [hidden]' : 'none',
+    }
+  });
+  next();
+});
+
+// Add catch-all route for debugging
 app.use((req: Request, res: Response) => {
-  console.log(`404 - Route not found: ${req.method} ${req.url}`);
+  console.log(`❌ Route not found: ${req.method} ${req.url}`);
   res.status(404).json({
     success: false,
-    message: `Route not found: ${req.method} ${req.url}`
+    error: {
+      code: "NOT_FOUND",
+      message: `Route not found: ${req.method} ${req.url}`
+    }
   });
 });
 
