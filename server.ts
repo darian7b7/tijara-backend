@@ -113,6 +113,16 @@ app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Add before your routes
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`📥 ${req.method} ${req.url}`, {
+    body: req.body,
+    query: req.query,
+    params: req.params,
+  });
+  next();
+});
+
 // Import Routes
 import authRoutes from "./routes/auth.routes.js";
 import listingRoutes from "./routes/listing.routes.js";
@@ -122,12 +132,27 @@ import uploadRoutes from "./routes/uploads.js";
 import notificationRoutes from "./routes/notification.routes.js";
 
 // Register Routes with /api prefix
-app.use("/api/auth", authRoutes);
-app.use("/api/listings", listingRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/messaging", messageRoutes);
-app.use("/api/uploads", uploadRoutes);
-app.use("/api/notifications", notificationRoutes);
+const apiRouter = express.Router();
+
+// Mount all routes on the API router
+apiRouter.use("/auth", authRoutes);
+apiRouter.use("/listings", listingRoutes);
+apiRouter.use("/users", userRoutes);
+apiRouter.use("/messaging", messageRoutes);
+apiRouter.use("/uploads", uploadRoutes);
+apiRouter.use("/notifications", notificationRoutes);
+
+// Mount the API router at /api
+app.use("/api", apiRouter);
+
+// Add a catch-all route for debugging
+app.use((req: Request, res: Response) => {
+  console.log(`404 - Route not found: ${req.method} ${req.url}`);
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.url}`
+  });
+});
 
 // Socket.io Setup
 const io = new Server(httpServer, {
