@@ -30,68 +30,90 @@ const signToken = (userId: string): string => {
 // Register a New User
 export const register = async (req: Request, res: Response) => {
   try {
+    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
+      console.log("Validation Errors:", errors.array());
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: errors.array()
+      });
     }
 
     const { username, email, password } = req.body;
+    console.log("Processing registration for:", { username, email });
 
+    // Check for existing user
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [{ email }, { username }],
       },
     });
-    
+
     if (existingUser) {
+      const field = existingUser.email === email ? "email" : "username";
+      console.log(`Registration failed: ${field} already exists`);
       return res.status(400).json({
         success: false,
-        error: "Username or email already exists",
-        status: 400
+        message: `This ${field} is already registered.`
       });
     }
 
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const user = await prisma.user.create({
-      data: {
-        username,
-        email,
-        password: hashedPassword,
-        role: 'USER', // Add default role
-      },
-    });
-
-    const accessToken = signToken(user.id);
-    const refreshToken = jwt.sign(
-      { id: user.id },
-      process.env.JWT_SECRET || '',
-      { expiresIn: "30d" }
-    );
-
-    res.status(201).json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          profilePicture: user.profilePicture,
+    // Create new user
+    try {
+      const salt = await bcrypt.genSalt(12);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      const user = await prisma.user.create({
+        data: {
+          username,
+          email,
+          password: hashedPassword,
+          role: 'USER', // Add default role
         },
-        tokens: {
-          accessToken,
-          refreshToken,
+      });
+
+      // Generate token
+      const accessToken = signToken(user.id);
+      const refreshToken = jwt.sign(
+        { id: user.id },
+        process.env.JWT_SECRET || '',
+        { expiresIn: "30d" }
+      );
+      console.log("Registration successful for:", email);
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            profilePicture: user.profilePicture,
+          },
+          tokens: {
+            accessToken,
+            refreshToken,
+          },
         },
-      },
-      status: 201
-    });
+      });
+    } catch (err) {
+      console.error("Database Error during registration:", err);
+      if (err instanceof prisma.PrismaClientKnownRequestError) {
+        if (err.code === 'P2002') {
+          return res.status(400).json({
+            success: false,
+            message: "This email or username is already registered."
+          });
+        }
+      }
+      throw err;
+    }
   } catch (error) {
-    console.error("Error registering user:", error);
-    res.status(500).json({
+    console.error("Registration Error:", error);
+    return res.status(500).json({
       success: false,
-      error: "Server error",
-      status: 500
+      message: "An error occurred during registration."
     });
   }
 };
@@ -99,18 +121,22 @@ export const register = async (req: Request, res: Response) => {
 // Login User
 export const login = async (req: Request, res: Response) => {
   try {
+    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log("Login Validation Errors:", errors.array());
       return res.status(400).json({
         success: false,
-        errors: errors.array(),
-        status: 400
+        message: "Validation failed",
+        errors: errors.array()
       });
     }
 
     const { email, password } = req.body;
+    console.log("Processing login for:", email);
 
-    const user = await prisma.user.findFirst({
+    // Find user
+    const user = await prisma.user.findUnique({
       where: { email },
       select: {
         id: true,
@@ -123,30 +149,33 @@ export const login = async (req: Request, res: Response) => {
     });
 
     if (!user) {
+      console.log("Login failed: User not found -", email);
       return res.status(401).json({
         success: false,
-        error: "Invalid credentials",
-        status: 401
+        message: "Invalid email or password"
       });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      console.log("Login failed: Invalid password -", email);
       return res.status(401).json({
         success: false,
-        error: "Invalid credentials",
-        status: 401
+        message: "Invalid email or password"
       });
     }
 
+    // Generate token
     const accessToken = signToken(user.id);
     const refreshToken = jwt.sign(
       { id: user.id },
       process.env.JWT_SECRET || '',
       { expiresIn: "30d" }
     );
+    console.log("Login successful for:", email);
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         user: {
@@ -161,14 +190,12 @@ export const login = async (req: Request, res: Response) => {
           refreshToken,
         },
       },
-      status: 200
     });
   } catch (error) {
-    console.error("Error logging in:", error);
-    res.status(500).json({
+    console.error("Login Error:", error);
+    return res.status(500).json({
       success: false,
-      error: "Server error",
-      status: 500
+      message: "An error occurred during login."
     });
   }
 };
@@ -213,7 +240,7 @@ export const getMe = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching user details:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: "Error fetching user details",
       status: 500
