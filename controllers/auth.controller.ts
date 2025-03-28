@@ -3,20 +3,21 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import prisma from "../lib/prismaClient.js";
 import { validationResult } from "express-validator";
-
-interface AuthRequest extends Request {
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    role: string;
-  };
-}
+import rateLimit from "express-rate-limit";
 
 interface AuthTokens {
   accessToken: string;
   refreshToken: string;
 }
+
+// Rate limiting for login attempts
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login attempts per window
+  message: "Too many login attempts, please try again after 15 minutes",
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
 
 const signToken = (userId: string): string => {
   if (!process.env.JWT_SECRET) {
@@ -33,7 +34,6 @@ export const register = async (req: Request, res: Response) => {
     console.log("Registration request received:", {
       email: req.body.email,
       username: req.body.username,
-      // Don't log password
     });
 
     // Validate request
@@ -81,14 +81,9 @@ export const register = async (req: Request, res: Response) => {
         username,
         email,
         password: hashedPassword,
-        name, // Required by schema
+        name,
         role: "USER",
       },
-    });
-
-    console.log("User created successfully:", {
-      id: user.id,
-      email: user.email,
     });
 
     // Generate tokens
@@ -99,6 +94,11 @@ export const register = async (req: Request, res: Response) => {
       { expiresIn: "30d" }
     );
 
+    console.log("User registered successfully:", {
+      id: user.id,
+      email: user.email,
+    });
+
     return res.status(201).json({
       success: true,
       data: {
@@ -106,9 +106,8 @@ export const register = async (req: Request, res: Response) => {
           id: user.id,
           username: user.username,
           email: user.email,
-          role: user.role,
           name: user.name,
-          profilePicture: user.profilePicture,
+          role: user.role,
         },
         tokens: {
           accessToken,
@@ -117,12 +116,12 @@ export const register = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("Registration Error:", error);
     return res.status(500).json({
       success: false,
       error: {
         code: "SERVER_ERROR",
-        message: "Registration failed due to server error"
+        message: "An error occurred during registration"
       }
     });
   }
@@ -231,50 +230,118 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
+// Refresh Token
+export const refreshToken = async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "MISSING_TOKEN",
+          message: "Refresh token is required"
+        }
+      });
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET || "") as { id: string };
+    
+    // Generate new tokens
+    const accessToken = signToken(decoded.id);
+    const newRefreshToken = jwt.sign(
+      { id: decoded.id },
+      process.env.JWT_SECRET || "",
+      { expiresIn: "30d" }
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        tokens: {
+          accessToken,
+          refreshToken: newRefreshToken,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Token Refresh Error:", error);
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: "INVALID_TOKEN",
+        message: "Invalid or expired refresh token"
+      }
+    });
+  }
+};
+
 // Logout User
-export const logout = (_req: Request, res: Response) => {
-  res.json({
+export const logout = (req: Request, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: "NOT_AUTHENTICATED",
+        message: "Not authenticated"
+      }
+    });
+  }
+
+  return res.json({
     success: true,
-    data: null,
     message: "Logged out successfully",
-    status: 200,
   });
 };
 
 // Get Authenticated User Info
-export const getMe = async (req: AuthRequest, res: Response) => {
+export const getMe = async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "NOT_AUTHENTICATED",
+          message: "Not authenticated"
+        }
+      });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
         id: true,
-        email: true,
         username: true,
+        email: true,
+        name: true,
         profilePicture: true,
         role: true,
-        createdAt: true,
       },
     });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: "User not found",
-        status: 404,
+        error: {
+          code: "USER_NOT_FOUND",
+          message: "User not found"
+        }
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: { user },
-      status: 200,
     });
   } catch (error) {
-    console.error("Error fetching user details:", error);
+    console.error("Get User Error:", error);
     return res.status(500).json({
       success: false,
-      error: "Error fetching user details",
-      status: 500,
+      error: {
+        code: "SERVER_ERROR",
+        message: "An error occurred while fetching user data"
+      }
     });
   }
 };

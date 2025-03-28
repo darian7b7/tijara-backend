@@ -3,12 +3,13 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import prisma from "../lib/prismaClient.js";
 
-// Custom type for Request with user
 declare global {
   namespace Express {
     interface Request {
       user?: {
         id: string;
+        email: string;
+        username: string;
         role: string;
       };
     }
@@ -42,92 +43,65 @@ export const listingLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-interface JwtPayload {
-  id: string;
-  iat?: number;
-  exp?: number;
-}
-
 // Verify JWT token
-export const protect = async (
+export const authenticate = async (
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) => {
   try {
-    console.log("🔒 Auth Middleware Headers:", {
-      auth: req.headers.authorization,
-      method: req.method,
-      path: req.path
-    });
-
-    let token: string | undefined;
-
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer")
-    ) {
-      token = req.headers.authorization.split(" ")[1];
-    }
+    // Get token from header
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : null;
 
     if (!token) {
-      console.log("❌ No token provided");
       return res.status(401).json({
         success: false,
         error: {
           code: "NO_TOKEN",
-          message: "Not authorized, no token"
+          message: "No token provided"
         }
       });
     }
 
-    try {
-      // Verify token
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET as string,
-      ) as JwtPayload;
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "") as {
+      id: string;
+    };
 
-      // Get user from token
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-        select: {
-          id: true,
-          role: true,
-        },
-      });
+    // Get user from token
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        role: true,
+      },
+    });
 
-      if (!user) {
-        console.log("❌ User not found for token");
-        return res.status(401).json({
-          success: false,
-          error: {
-            code: "USER_NOT_FOUND",
-            message: "User not found"
-          }
-        });
-      }
-
-      console.log("✅ Token verified for user:", user.id);
-      req.user = user;
-      next();
-    } catch (error) {
-      console.error("❌ Token verification failed:", error);
+    if (!user) {
       return res.status(401).json({
         success: false,
         error: {
           code: "INVALID_TOKEN",
-          message: "Not authorized, invalid token"
+          message: "Invalid token"
         }
       });
     }
+
+    // Add user to request
+    req.user = user;
+    next();
   } catch (error) {
-    console.error("❌ Auth middleware error:", error);
-    res.status(401).json({
+    console.error("Authentication Error:", error);
+    return res.status(401).json({
       success: false,
       error: {
         code: "AUTH_ERROR",
-        message: "Authentication failed"
+        message: "Not authorized"
       }
     });
   }
@@ -136,7 +110,13 @@ export const protect = async (
 // Admin middleware
 export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || req.user.role !== "ADMIN") {
-    return res.status(403).json({ message: "Forbidden: Admins only" });
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: "FORBIDDEN",
+        message: "Forbidden: Admins only"
+      }
+    });
   }
   next();
 };
