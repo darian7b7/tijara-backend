@@ -116,10 +116,20 @@ app.get("/health", (req: Request, res: Response) => {
 // Add before your routes
 app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`📥 ${req.method} ${req.url}`, {
+    headers: req.headers,
     body: req.body,
     query: req.query,
-    params: req.params,
   });
+  
+  // Log response
+  const originalSend = res.send;
+  res.send = function (body) {
+    console.log(`📤 Response ${res.statusCode}`, {
+      body: body,
+    });
+    return originalSend.call(this, body);
+  };
+  
   next();
 });
 

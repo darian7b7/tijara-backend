@@ -30,22 +30,27 @@ const signToken = (userId: string): string => {
 // Register a New User
 export const register = async (req: Request, res: Response) => {
   try {
-    console.log("📝 Registration request:", {
+    console.log("Registration request received:", {
       email: req.body.email,
       username: req.body.username,
+      // Don't log password
     });
 
+    // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log("❌ Validation errors:", errors.array());
+      console.log("Validation errors:", errors.array());
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
-        errors: errors.array(),
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Validation failed",
+          details: errors.array()
+        }
       });
     }
 
-    const { username, email, password } = req.body;
+    const { username, email, password, name } = req.body;
 
     // Check for existing user
     const existingUser = await prisma.user.findFirst({
@@ -56,27 +61,35 @@ export const register = async (req: Request, res: Response) => {
 
     if (existingUser) {
       const field = existingUser.email === email ? "email" : "username";
-      console.log(`❌ Registration failed: ${field} already exists`);
+      console.log(`Registration failed: ${field} already exists`);
       return res.status(400).json({
         success: false,
-        message: `This ${field} is already registered.`,
+        error: {
+          code: "DUPLICATE_ENTRY",
+          message: `This ${field} is already registered.`
+        }
       });
     }
 
-    // Create new user
+    // Hash password
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Create user
     const user = await prisma.user.create({
       data: {
         username,
         email,
         password: hashedPassword,
+        name, // Required by schema
         role: "USER",
       },
     });
 
-    console.log("✅ User created:", { id: user.id, email: user.email });
+    console.log("User created successfully:", {
+      id: user.id,
+      email: user.email,
+    });
 
     // Generate tokens
     const accessToken = signToken(user.id);
@@ -94,6 +107,7 @@ export const register = async (req: Request, res: Response) => {
           username: user.username,
           email: user.email,
           role: user.role,
+          name: user.name,
           profilePicture: user.profilePicture,
         },
         tokens: {
@@ -103,10 +117,13 @@ export const register = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("❌ Registration error:", error);
+    console.error("Registration error:", error);
     return res.status(500).json({
       success: false,
-      message: "Registration failed",
+      error: {
+        code: "SERVER_ERROR",
+        message: "Registration failed due to server error"
+      }
     });
   }
 };

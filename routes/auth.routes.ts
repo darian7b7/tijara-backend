@@ -17,11 +17,29 @@ const asyncHandler =
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 
+// Registration validation middleware
+const registerValidation = [
+  body("email")
+    .trim()
+    .isEmail()
+    .withMessage("Please enter a valid email"),
+  body("username")
+    .trim()
+    .isLength({ min: 3 })
+    .withMessage("Username must be at least 3 characters long"),
+  body("password")
+    .isLength({ min: 6 })
+    .withMessage("Password must be at least 6 characters long"),
+  body("name")
+    .trim()
+    .notEmpty()
+    .withMessage("Name is required"),
+];
+
 // Register Route with Validation
 router.post(
   "/register",
-  validateRegistration,
-  validate,
+  registerValidation,
   asyncHandler(register)
 );
 
