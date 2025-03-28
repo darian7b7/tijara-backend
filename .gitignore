@@ -34,12 +34,7 @@ cypress/screenshots/
 # ========================================
 # 🔒 Environment Variables (Never commit!)
 # ========================================
-.env
-.env.*.local
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+
 
 # ========================================
 # 🔐 Security Keys & Credentials
