@@ -129,6 +129,17 @@ import notificationRoutes from "./routes/notification.routes.js";
 // Create API router
 const apiRouter = express.Router();
 
+// Add debug logging for API routes
+apiRouter.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`📥 API Request:`, {
+    method: req.method,
+    path: req.path,
+    body: req.body,
+    query: req.query,
+  });
+  next();
+});
+
 // Mount routes on API router
 apiRouter.use("/auth", authRoutes);
 apiRouter.use("/listings", listingRoutes);
