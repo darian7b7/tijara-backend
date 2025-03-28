@@ -61,6 +61,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["set-cookie"]
   })
 );
 
@@ -70,7 +71,26 @@ app.options('*', cors());
 // Middleware: Body parsers
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Cookie parser middleware
 app.use(cookieParser());
+
+// Configure secure cookie settings
+app.use((req, res, next) => {
+  res.cookie = res.cookie.bind(res);
+  const originalSetCookie = res.setHeader.bind(res, 'Set-Cookie');
+  res.setHeader = function(name: string, value: any) {
+    if (name.toLowerCase() === 'set-cookie') {
+      if (Array.isArray(value)) {
+        value = value.map(v => v + '; SameSite=None; Secure');
+      } else if (typeof value === 'string') {
+        value = value + '; SameSite=None; Secure';
+      }
+    }
+    return originalSetCookie(value);
+  };
+  next();
+});
 
 // Middleware: Rate Limiting
 const limiter = rateLimit({
