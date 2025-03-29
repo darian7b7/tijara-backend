@@ -1,17 +1,17 @@
 import express, { Request, Response, NextFunction } from "express";
-import { protect } from "../middleware/auth.js";
+import { protect } from "../middleware/auth";
 import {
   updateProfile,
   getUserProfile,
   getUserListings,
   getUserSettings,
   updateUserSettings,
-} from "../controllers/user.controller.js";
+} from "../controllers/user.controller";
 import {
   upload,
   processImage,
   uploadToR2,
-} from "../middleware/upload.middleware.js";
+} from "../middleware/upload.middleware";
 
 // Define AuthRequest type for type safety
 interface AuthRequest extends Request {

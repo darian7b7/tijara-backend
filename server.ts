@@ -6,11 +6,11 @@ import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import { createServer } from "node:http";
 import { Server, Socket } from "socket.io";
-import prisma from "./lib/prismaClient.js";
+import prisma from "./lib/prismaClient";
 import dotenv from "dotenv";
 import morgan from "morgan";
-import errorHandler from "./middleware/errorHandler.js";
-import { getDirname } from "./utils/path.utils.js";
+import errorHandler from "./middleware/errorHandler";
+import { getDirname } from "./utils/path.utils";
 const __dirname = getDirname(import.meta.url);
 
 // Load environment variables
@@ -20,31 +20,38 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-// Middleware: Security
+// Middleware
 app.use(helmet());
 app.use(compression());
+app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Middleware: Logging
-if (process.env.NODE_ENV === "development") {
-  app.use(morgan("dev"));
-}
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again later.",
+});
+app.use(limiter);
 
-// Middleware: CORS
-app.use(cors({
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    console.log("🌐 CORS Request from:", origin);
+// CORS Configuration
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (!origin) {
+      return callback(null, true);
+    }
     
     const allowedOrigins = [
-      'https://tijara-frontend.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:5173'
+      "http://localhost:5173", // Vite default port
+      "http://localhost:3000", // Alternative port
+      "https://tijara-frontend-production.up.railway.app"
     ];
-
-    if (!origin || allowedOrigins.includes(origin)) {
+    
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log(`❌ Blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
@@ -52,26 +59,20 @@ app.use(cors({
   allowedHeaders: [
     'Content-Type',
     'Authorization',
-    'X-Requested-With',
     'Accept',
-    'Origin'
-  ],
-  exposedHeaders: ['Content-Range', 'X-Content-Range']
-}));
+    'Origin',
+    'X-Requested-With',
+    'Access-Control-Allow-Origin',
+    'Access-Control-Allow-Credentials'
+  ]
+};
 
-// Middleware: Body Parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
+app.use(cors(corsOptions));
 
-// Middleware: Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: "Too many requests from this IP, please try again after 15 minutes"
-});
-
-app.use(limiter);
+// Logging
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
 
 // Add before your routes
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -93,13 +94,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Error handling middleware
+app.use(errorHandler);
+
 // Import Routes
-import authRoutes from "./routes/auth.routes.js";
-import listingRoutes from "./routes/listing.routes.js";
-import userRoutes from "./routes/user.routes.js";
-import messageRoutes from "./routes/message.routes.js";
-import uploadRoutes from "./routes/uploads.js";
-import notificationRoutes from "./routes/notification.routes.js";
+import authRoutes from "./routes/auth.routes";
+import listingRoutes from "./routes/listing.routes";
+import userRoutes from "./routes/user.routes";
+import messageRoutes from "./routes/message.routes";
+import uploadRoutes from "./routes/uploads";
+import notificationRoutes from "./routes/notification.routes";
 
 // Mount routes directly (no /api prefix)
 app.use("/api/auth", authRoutes);
@@ -167,9 +171,6 @@ io.on("connection", (socket: Socket) => {
     console.log("User disconnected:", socket.id);
   });
 });
-
-// Error handling
-app.use(errorHandler);
 
 async function startServer() {
   try {

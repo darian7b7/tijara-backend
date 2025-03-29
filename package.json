@@ -5,12 +5,12 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node --esm src/server.ts",
+    "dev": "tsx watch server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "db:push": "dotenv -e .env -- prisma db push",
+    "db:push": "prisma db push",
     "generate": "prisma generate",
-    "postinstall": "prisma generate && prisma migrate deploy"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
@@ -54,13 +54,15 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/morgan": "^1.9.9",
     "@types/multer": "^1.4.12",
-    "@types/node": "^20.11.19",
+    "@types/node": "^20.17.28",
     "@types/nodemailer": "^6.4.17",
     "@types/socket.io": "^3.0.1",
     "@types/validator": "^13.11.9",
     "nodemon": "^3.1.9",
     "prisma": "^6.5.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
   }
 }
