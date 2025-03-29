@@ -102,7 +102,7 @@ import uploadRoutes from "./routes/uploads.js";
 import notificationRoutes from "./routes/notification.routes.js";
 
 // Mount routes directly (no /api prefix)
-app.use("/auth", authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/listings", listingRoutes);
 app.use("/users", userRoutes);
 app.use("/messages", messageRoutes);
