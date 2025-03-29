@@ -16,11 +16,11 @@ const generateTokens = (userId: string): AuthTokens => {
   }
 
   const accessTokenOptions: SignOptions = {
-    expiresIn: Number(process.env.JWT_EXPIRY?.replace(/[^0-9]/g, '')) || 7 * 24 * 60 * 60,
+    expiresIn: parseInt(process.env.JWT_EXPIRY || "604800", 10), // 7 days in seconds
   };
 
   const refreshTokenOptions: SignOptions = {
-    expiresIn: Number(process.env.REFRESH_TOKEN_EXPIRY?.replace(/[^0-9]/g, '')) || 30 * 24 * 60 * 60,
+    expiresIn: parseInt(process.env.REFRESH_TOKEN_EXPIRY || "2592000", 10), // 30 days in seconds
   };
 
   const accessToken = jwt.sign({ id: userId }, jwtSecret, accessTokenOptions);
@@ -40,34 +40,36 @@ export const register = async (req: Request, res: Response) => {
     // Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log("Validation errors:", errors.array());
       return res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Validation failed",
-          details: errors.array()
+          message: "Invalid input data",
+          errors: errors.array()
         }
       });
     }
 
     const { username, email, password, name } = req.body;
 
-    // Check for existing user
+    // Check if user exists
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ email }, { username }],
-      },
+        OR: [
+          { email },
+          { username }
+        ]
+      }
     });
 
     if (existingUser) {
-      const field = existingUser.email === email ? "email" : "username";
-      console.log(`Registration failed: ${field} already exists`);
       return res.status(400).json({
         success: false,
         error: {
-          code: "DUPLICATE_ENTRY",
-          message: `This ${field} is already registered.`
+          code: "USER_EXISTS",
+          message: existingUser.email === email 
+            ? "Email already registered" 
+            : "Username already taken"
         }
       });
     }
@@ -123,36 +125,14 @@ export const register = async (req: Request, res: Response) => {
 // Login User
 export const login = async (req: Request, res: Response) => {
   try {
-    console.log("Login attempt for:", req.body.email);
-    
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Email and password are required"
-        }
-      });
-    }
 
     // Find user
     const user = await prisma.user.findUnique({
       where: { email },
-      select: {
-        id: true,
-        email: true,
-        password: true,
-        username: true,
-        name: true,
-        profilePicture: true,
-        role: true,
-      },
     });
 
     if (!user) {
-      console.log("Login failed: User not found -", email);
       return res.status(401).json({
         success: false,
         error: {
@@ -164,13 +144,7 @@ export const login = async (req: Request, res: Response) => {
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
-    console.log("Password verification:", {
-      isValid: isValidPassword,
-      userEmail: email
-    });
-
     if (!isValidPassword) {
-      console.log("Login failed: Invalid password -", email);
       return res.status(401).json({
         success: false,
         error: {
@@ -185,8 +159,7 @@ export const login = async (req: Request, res: Response) => {
 
     console.log("Login successful:", {
       userId: user.id,
-      email: user.email,
-      tokensGenerated: true
+      email: user.email
     });
 
     return res.json({
