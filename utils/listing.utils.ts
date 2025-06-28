@@ -1,10 +1,10 @@
-import { RealEstateDetails, VehicleDetails } from "types/shared.js";
-import { PropertyType, VehicleType } from "types/enums.js";
-import { schemaMap } from "schemas/listingSchemaMap.js";
+import { RealEstateDetails, VehicleDetails } from "../types/shared.js";
+import { PropertyType, VehicleType } from "../types/enums.js";
+import { schemaMap } from "../schemas/listingSchemaMap.js";
 
 export const filterListingDetails = (
   listingDetails: VehicleDetails | RealEstateDetails,
-  listingType: VehicleType | PropertyType,
+  listingType: VehicleType | PropertyType
 ): VehicleDetails | RealEstateDetails => {
   try {
     if ("vehicleType" in listingDetails) {

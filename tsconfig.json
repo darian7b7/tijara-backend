@@ -21,7 +21,7 @@
     "types": ["node", "express", "multer"],
     "typeRoots": ["./node_modules/@types", "./types"]
   },
-  "include": ["src/**/*", "server.ts", "build.js", "routes/contact.routes.ts", "controllers/contact.controller.ts", "controllers/listingPermission.controller.ts", "middleware/listingPermission.ts", "routes/listingPermission.routes.ts"],
+  "include": ["src/**/*", "server.ts", "build.js", "routes/contact.routes.ts", "controllers/contact.controller.ts", "controllers/listingPermission.controller.ts", "middleware/listingPermission.ts", "routes/listingPermission.routes.ts", "utils/listing.utils.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
   "ts-node": {
     "esm": true,
