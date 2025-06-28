@@ -261,7 +261,7 @@ export default async function (fastify: FastifyInstance) {
 
       console.log("formattedListings: >>>>>>>>>>>> \n", formattedListings);
 
-      reply.send({
+      return reply.send({
         success: true,
         data: {
           items: formattedListings,
@@ -272,7 +272,6 @@ export default async function (fastify: FastifyInstance) {
         },
         status: 200,
       });
-      return;
     } catch (error) {
       console.error("Error fetching listings:", error);
       return reply.code(500).send({
@@ -1526,8 +1525,8 @@ export default async function (fastify: FastifyInstance) {
                 typeof existingImages === "string"
                   ? JSON.parse(existingImages)
                   : Array.isArray(existingImages)
-                  ? existingImages
-                  : [];
+                    ? existingImages
+                    : [];
               console.log(
                 "🔍 [DEBUG] Parsed existing images:",
                 parsedExistingImages
